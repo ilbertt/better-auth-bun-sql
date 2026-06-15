@@ -39,5 +39,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          body=$(bunx git-cliff --latest --strip header)
+          body=$(bun scripts/release-notes.ts)
           gh release create "$TAG_NAME" --title "$TAG_NAME" --notes "$body"
