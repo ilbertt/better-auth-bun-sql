@@ -26,12 +26,7 @@ jobs:
       - name: Update package.json version
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          bun --eval '
-            const p = await Bun.file("package.json").json();
-            p.version = process.env.VERSION;
-            await Bun.write("package.json", JSON.stringify(p, null, 2) + "\n");
-          '
+        run: bun scripts/set-version.ts "$VERSION"
 
       - name: Generate changelog
         run: bun scripts/generate-changelog.ts
