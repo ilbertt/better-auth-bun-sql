@@ -50,16 +50,7 @@ This is a **Bun-only** package. It ships the raw TypeScript source for the runti
 - **Runtime:** Bun matches the `"bun"` condition and imports `src/index.ts` directly (Bun transpiles TS natively). That's why `src/**/*.ts` is in `files` and the `#*` map resolves at the consumer (`./src/*` is shipped). No `default`/`import` fallback — non-Bun runtimes are intentionally unsupported.
 - **Types:** the type-check path is always vanilla `tsc` (the consumer's editor/build), never Bun. So types come from `dist/`, which `bun run build` generates by running `tsc --project tsconfig.build.json` (declaration-only emit). Pointing `types` at the raw `src/index.ts` does **not** work for this package: `tsc` would parse our internal `bun:sql`/`Bun` references and fail (TS2307) unless every consumer configures Bun types — and `skipLibCheck` only rescues `.d.ts`, not `.ts`. The generated `.d.ts` exposes only the public surface and is `skipLibCheck`-eligible. The top-level `types` field mirrors `./dist/index.d.ts` so npm shows the TypeScript badge.
 
-`bun run build` (`build.ts`, via Bun's `$` shell) emits only `.d.ts` files into `dist/`, mirroring the `src/` layout. Keep imports that appear in the public type surface relative (`./foo`) so the emitted declarations resolve against sibling `.d.ts` files in `dist/`; `#*` is for runtime/internal use. `better-auth` is a peer dependency.
-
-### Release workflow
-
-Versioning and changelog come from [git-cliff](https://git-cliff.org) (a devDependency, run via `bunx git-cliff`; config in `cliff.toml`), driven by the Conventional Commits history. Two workflows:
-
-- **`prepare-release.yml`** (manual `workflow_dispatch`): computes the next version with `scripts/bumped-version.sh`, writes it into `package.json`, regenerates `CHANGELOG.md` with `scripts/generate-changelog.sh`, then opens a `chore(release): vX.Y.Z` PR. Set a `RELEASE_TOKEN` secret (PAT/App token) so that PR triggers the required CI checks — the default `GITHUB_TOKEN` won't.
-- **`publish.yml`** (on `v*` tag push): builds, publishes to npm via Trusted Publishing (OIDC — needs a trusted publisher configured on npmjs.com and `id-token: write`), and creates a GitHub Release with git-cliff–generated notes.
-
-To cut a release: run `prepare-release` → merge the PR → `git tag vX.Y.Z && git push origin vX.Y.Z`.
+`bun run build` (`build.ts`, via Bun's `$` shell) emits only `.d.ts` files into `dist/`, mirroring the `src/` layout. Keep imports that appear in the public type surface relative (`./foo`) so the emitted declarations resolve against sibling `.d.ts` files in `dist/`; `#*` is for runtime/internal use. `better-auth` is a peer dependency. Releases are git-cliff–driven; see `.github/CONTRIBUTING.md`.
 
 ## Pull requests
 
