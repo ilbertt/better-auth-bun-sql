@@ -6,7 +6,7 @@
 
 - **Runtime:** Bun (the adapter relies on `bun:sql` and is Bun-only)
 - **Linter/Formatter:** Biome (auto-formats on save)
-- **Tests:** vitest, run with `bun run test` (the `test` script is `bun --bun vitest run`, so the Bun runtime — `bun:sql` — is available to tests). Test files import from `vitest` (not `bun:test`) and use the `.test.ts` suffix. Includes better-auth's official `@better-auth/test-utils` conformance suite in `tests/adapter.conformance.test.ts`. Note `bun test` (no `run`) invokes Bun's native runner and is **not** what this project uses.
+- **Tests:** vitest — run with `bun run test` (imports from `vitest`, not `bun:test`)
 - **Commits:** Conventional Commits (commitlint)
 
 The Bun version is pinned in three places that must be bumped together: `.bun-version` (consumed by CI's `setup-bun` — keep it version-only, no comments), `packageManager` in `package.json`, and `engines.bun`.
