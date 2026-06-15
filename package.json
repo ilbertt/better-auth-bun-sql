@@ -1,0 +1,56 @@
+{
+  "name": "@ilbertt/better-auth-bun-sql",
+  "description": "A better-auth database adapter for Bun's built-in SQL module (bun:sql)",
+  "version": "0.0.1",
+  "author": "ilbertt",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ilbertt/better-auth-bun-sql"
+  },
+  "license": "Unlicense",
+  "type": "module",
+  "engines": {
+    "bun": "^1.3.0",
+    "node": "please-use-bun"
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "src/**/*.ts",
+    "dist/*.d.ts",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "bun": "./src/index.ts"
+    }
+  },
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "build": "bun run build.ts",
+    "test": "bun test",
+    "check:types": "bun run --bun tsc",
+    "check:codestyle": "bun run --bun biome check",
+    "check:all": "bun check:types && bun check:codestyle",
+    "check:commit-message": "bun run --bun commitlint",
+    "fix:codestyle": "bun run --bun biome check --write"
+  },
+  "peerDependencies": {
+    "better-auth": ">=1.6.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
+    "@commitlint/format": "^21.0.1",
+    "@commitlint/types": "^21.0.1",
+    "@types/bun": "^1.3.14",
+    "better-auth": "^1.6.18",
+    "typescript": "^6.0.3"
+  },
+  "packageManager": "bun@1.3.14"
+}
