@@ -1,0 +1,77 @@
+name: prepare-release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          # A PAT/App token (secret RELEASE_TOKEN) lets the release PR trigger
+          # the required CI checks. With the default GITHUB_TOKEN those checks
+          # won't run on the PR, so set RELEASE_TOKEN to merge cleanly.
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - uses: ./.github/actions/prepare
+
+      - name: Compute next version
+        id: version
+        run: echo "version=$(./scripts/bumped-version.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Update package.json version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          bun --eval '
+            const p = await Bun.file("package.json").json();
+            p.version = process.env.VERSION;
+            await Bun.write("package.json", JSON.stringify(p, null, 2) + "\n");
+          '
+
+      - name: Generate changelog
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: ./scripts/generate-changelog.sh
+
+      - name: Configure git user
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Commit and push to release branch
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_BRANCH: release/v${{ steps.version.outputs.version }}
+        run: |
+          git switch -c "$RELEASE_BRANCH"
+          git add package.json CHANGELOG.md
+          git commit -m "chore(release): v${VERSION}"
+          git push --set-upstream origin "$RELEASE_BRANCH"
+
+      - name: Create release PR
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+        run: |
+          gh pr create \
+            --title "chore(release): v${VERSION}" \
+            --body "$(cat <<EOF
+          Bumps version to **${VERSION}** and regenerates CHANGELOG.md.
+
+          After merging, tag and push to trigger the publish workflow:
+
+          \`\`\`
+          git tag v${VERSION}
+          git push origin v${VERSION}
+          \`\`\`
+          EOF
+          )"

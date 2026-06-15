@@ -1,0 +1,48 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  id-token: write # OIDC token for npm Trusted Publishing
+  contents: write # create the GitHub Release
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: Publish
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/prepare
+
+      - name: Build
+        run: bun run build
+
+      - name: Setup Node for npm publish
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # Trusted Publishing (OIDC) requires npm >= 11.5.1; the runner ships an older npm.
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+
+      - name: Publish to npm
+        run: npm publish --access public --provenance
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          body=$(bunx git-cliff --latest --strip header)
+          gh release create "$TAG_NAME" --title "$TAG_NAME" --notes "$body"
