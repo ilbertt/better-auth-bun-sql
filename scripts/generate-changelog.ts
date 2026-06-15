@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
 // Regenerates CHANGELOG.md, including the next (bumped) unreleased section.
-import { $ } from 'bun';
+import { runGitCliff } from 'git-cliff';
 
-await $`bunx git-cliff --bump -o CHANGELOG.md`;
+await runGitCliff({ bump: 'auto', output: 'CHANGELOG.md' });

@@ -16,9 +16,6 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          # RELEASE_TOKEN (PAT/App token) so the release PR triggers required CI;
-          # GITHUB_TOKEN-created PRs don't. Falls back to GITHUB_TOKEN if unset.
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - uses: ./.github/actions/prepare
 
@@ -57,7 +54,7 @@ jobs:
       - name: Create release PR
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh pr create \
             --title "chore(release): v${VERSION}" \

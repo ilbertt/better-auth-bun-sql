@@ -36,4 +36,6 @@ Versioning and the changelog are derived from the Conventional Commits history b
    git push origin vX.Y.Z
    ```
 
-Maintainer setup (one-time): a `RELEASE_TOKEN` secret (PAT or App token) so the release PR runs CI, and an npm Trusted Publisher (OIDC) for `@ilbertt/better-auth-bun-sql`.
+Maintainer setup (one-time): configure an npm Trusted Publisher (OIDC) for `@ilbertt/better-auth-bun-sql` so `publish` can release without a token.
+
+> The release PR is opened by the built-in `GITHUB_TOKEN`, so GitHub won't auto-run CI on it. Re-run the checks (or push an empty commit) if you've made them required for merging.
