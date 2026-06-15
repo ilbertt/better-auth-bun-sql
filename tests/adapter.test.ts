@@ -266,31 +266,26 @@ describe('bun sql adapter', () => {
 // asserts detection works for every form a user might instantiate, including
 // when no explicit adapter/options are given.
 describe('dialect detection from bun:sql instances', () => {
-  it('detects postgres from connection strings and option objects', () => {
-    const instances = [
-      new SQL('postgres://u:p@h:5432/d'),
-      new SQL('postgresql://u:p@h/d'),
-      new SQL({ hostname: 'h', database: 'd' } as never),
-    ];
-    for (const sql of instances) {
-      const quirks = resolveDialect({ sql });
-      expect(quirks.supportsDates).toBe(true);
-      expect(quirks.supportsBooleans).toBe(true);
-    }
+  it.each([
+    { label: 'postgres:// URL', make: () => new SQL('postgres://u:p@h:5432/d') },
+    { label: 'postgresql:// URL', make: () => new SQL('postgresql://u:p@h/d') },
+    {
+      label: 'options object (no URL)',
+      make: () => new SQL({ hostname: 'h', database: 'd' } as never),
+    },
+  ])('detects postgres from $label', ({ make }) => {
+    const quirks = resolveDialect({ sql: make() });
+    expect(quirks.supportsDates).toBe(true);
+    expect(quirks.supportsBooleans).toBe(true);
   });
 
-  it('detects sqlite from sqlite connection strings', () => {
-    const instances = [new SQL(':memory:'), new SQL('sqlite://my.db'), new SQL('file:my.db')];
-    for (const sql of instances) {
-      const quirks = resolveDialect({ sql });
-      expect(quirks.supportsDates).toBe(false);
-      expect(quirks.supportsBooleans).toBe(false);
-    }
+  it.each([':memory:', 'sqlite://my.db', 'file:my.db'])('detects sqlite from %s', (conn) => {
+    const quirks = resolveDialect({ sql: new SQL(conn) });
+    expect(quirks.supportsDates).toBe(false);
+    expect(quirks.supportsBooleans).toBe(false);
   });
 
-  it('throws on a mysql connection', () => {
-    expect(() => resolveDialect({ sql: new SQL('mysql://u:p@h:3306/d') })).toThrow(
-      /only Postgres and SQLite/,
-    );
+  it.each(['mysql://u:p@h:3306/d', 'mariadb://u:p@h:3306/d'])('throws on %s', (conn) => {
+    expect(() => resolveDialect({ sql: new SQL(conn) })).toThrow(/only Postgres and SQLite/);
   });
 });
