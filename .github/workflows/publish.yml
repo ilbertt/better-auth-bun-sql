@@ -28,12 +28,8 @@ jobs:
       - name: Setup Node for npm publish
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
-
-      # Trusted Publishing (OIDC) requires npm >= 11.5.1; the runner ships an older npm.
-      - name: Upgrade npm
-        run: npm install -g npm@latest
 
       - name: Publish to npm
         run: npm publish --access public --provenance
