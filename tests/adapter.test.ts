@@ -1,5 +1,6 @@
-import type { SQL } from 'bun';
+import { SQL } from 'bun';
 import { describe, expect, it } from 'vitest';
+import { resolveDialect } from '#dialect.ts';
 import { type BunSqlAdapterConfig, bunSqlAdapter } from '#index.ts';
 
 type Call = { text: string; params: unknown[] };
@@ -258,5 +259,38 @@ describe('bun sql adapter', () => {
       const { sql } = fakeSql({ adapter: 'mysql' });
       expect(() => makeAdapter({ sql })).toThrow(/only Postgres and SQLite/);
     });
+  });
+});
+
+// `bun:sql` resolves the engine at construction (no connection needed), so this
+// asserts detection works for every form a user might instantiate, including
+// when no explicit adapter/options are given.
+describe('dialect detection from bun:sql instances', () => {
+  it('detects postgres from connection strings and option objects', () => {
+    const instances = [
+      new SQL('postgres://u:p@h:5432/d'),
+      new SQL('postgresql://u:p@h/d'),
+      new SQL({ hostname: 'h', database: 'd' } as never),
+    ];
+    for (const sql of instances) {
+      const quirks = resolveDialect({ sql });
+      expect(quirks.supportsDates).toBe(true);
+      expect(quirks.supportsBooleans).toBe(true);
+    }
+  });
+
+  it('detects sqlite from sqlite connection strings', () => {
+    const instances = [new SQL(':memory:'), new SQL('sqlite://my.db'), new SQL('file:my.db')];
+    for (const sql of instances) {
+      const quirks = resolveDialect({ sql });
+      expect(quirks.supportsDates).toBe(false);
+      expect(quirks.supportsBooleans).toBe(false);
+    }
+  });
+
+  it('throws on a mysql connection', () => {
+    expect(() => resolveDialect({ sql: new SQL('mysql://u:p@h:3306/d') })).toThrow(
+      /only Postgres and SQLite/,
+    );
   });
 });
