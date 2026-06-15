@@ -38,4 +38,4 @@ Versioning and the changelog are derived from the Conventional Commits history b
 
 Maintainer setup (one-time): configure an npm Trusted Publisher (OIDC) for `@ilbertt/better-auth-bun-sql` so `publish` can release without a token.
 
-> The release PR is opened by the built-in `GITHUB_TOKEN`, so GitHub won't auto-run CI on it. Re-run the checks (or push an empty commit) if you've made them required for merging.
+> The release PR is opened by `github-actions[bot]` via the built-in `GITHUB_TOKEN`, so its checks are gated — click **Approve and run** on the PR to let CI run before merging.
