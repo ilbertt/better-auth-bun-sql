@@ -12,9 +12,41 @@ bun add @ilbertt/better-auth-bun-sql
 
 ## Usage
 
+Pass a `bun:sql` instance — connected to Postgres or SQLite — to `bunSqlAdapter`:
+
 ```ts
-// Coming soon.
+import { betterAuth } from 'better-auth';
+import { SQL } from 'bun';
+import { bunSqlAdapter } from '@ilbertt/better-auth-bun-sql';
+
+const sql = new SQL(process.env.DATABASE_URL); // e.g. postgres://… or sqlite://…
+
+export const auth = betterAuth({
+  database: bunSqlAdapter({ sql }),
+});
 ```
+
+### Options
+
+| Option      | Type                      | Default           | Description                                                                                                                                     |
+| ----------- | ------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sql`       | `SQL`                     | —                 | **Required.** A `bun:sql` instance connected to a Postgres or SQLite database.                                                                  |
+| `schema`    | `string`                  | _(unqualified)_   | Database schema (namespace) the tables live in. When omitted, table names are unqualified and resolved against the connection's `search_path`. |
+| `dialect`   | `'postgres' \| 'sqlite'`  | _(auto-detected)_ | Overrides the engine detected from `sql.options.adapter`. Detection falls back to Postgres when the instance can't be introspected.            |
+| `usePlural` | `boolean`                 | `false`           | Pluralize table names (`user` → `users`).                                                                                                      |
+| `debugLogs` | `DBAdapterDebugLogOption` | `false`           | better-auth adapter debug logging.                                                                                                             |
+
+### Database schema
+
+Generate and apply the better-auth tables with the [better-auth CLI](https://better-auth.com/docs/concepts/cli):
+
+```sh
+bunx @better-auth/cli generate
+```
+
+## Supported databases
+
+`bun:sql` speaks Postgres, SQLite, and MySQL/MariaDB, but this adapter supports **Postgres and SQLite only**. MySQL/MariaDB lack the `RETURNING` clause the adapter relies on for `create`/`update`, so they are intentionally unsupported (the adapter throws on a MySQL/MariaDB connection). The dialect is detected automatically from the `bun:sql` instance and can be overridden with the `dialect` option.
 
 ## Requirements
 
