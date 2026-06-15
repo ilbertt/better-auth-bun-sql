@@ -1,11 +1,3 @@
-/**
- * Regenerates the test schema fixtures from better-auth's own migration
- * generator — the same code path as `@better-auth/cli generate`. The fixtures
- * are therefore the canonical better-auth core tables for the installed
- * version, never hand-authored. Re-run after bumping better-auth:
- *
- *   bun run scripts/generate-auth-schema-fixtures.ts
- */
 import { Database } from 'bun:sqlite';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
