@@ -50,7 +50,11 @@ This is a **Bun-only** package. It ships the raw TypeScript source for the runti
 - **Runtime:** Bun matches the `"bun"` condition and imports `src/index.ts` directly (Bun transpiles TS natively). That's why `src/**/*.ts` is in `files` and the `#*` map resolves at the consumer (`./src/*` is shipped). No `default`/`import` fallback — non-Bun runtimes are intentionally unsupported.
 - **Types:** the type-check path is always vanilla `tsc` (the consumer's editor/build), never Bun. So types come from `dist/`, which `bun run build` generates by running `tsc --project tsconfig.build.json` (declaration-only emit). Pointing `types` at the raw `src/index.ts` does **not** work for this package: `tsc` would parse our internal `bun:sql`/`Bun` references and fail (TS2307) unless every consumer configures Bun types — and `skipLibCheck` only rescues `.d.ts`, not `.ts`. The generated `.d.ts` exposes only the public surface and is `skipLibCheck`-eligible. The top-level `types` field mirrors `./dist/index.d.ts` so npm shows the TypeScript badge.
 
-`bun run build` (`build.ts`, via Bun's `$` shell) emits only `.d.ts` files into `dist/`, mirroring the `src/` layout. Keep imports that appear in the public type surface relative (`./foo`) so the emitted declarations resolve against sibling `.d.ts` files in `dist/`; `#*` is for runtime/internal use. `better-auth` is a peer dependency. The release workflow will be added later.
+`bun run build` (`build.ts`, via Bun's `$` shell) emits only `.d.ts` files into `dist/`, mirroring the `src/` layout. Keep imports that appear in the public type surface relative (`./foo`) so the emitted declarations resolve against sibling `.d.ts` files in `dist/`; `#*` is for runtime/internal use. `better-auth` is a peer dependency. Releases are git-cliff–driven; see `.github/CONTRIBUTING.md`.
+
+## Pull requests
+
+Keep PR descriptions minimal — the diff is self-explanatory, so don't enumerate every change. State the intent in a line or two.
 
 ## Keeping this file up to date
 

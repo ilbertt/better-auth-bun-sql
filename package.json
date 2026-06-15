@@ -50,6 +50,7 @@
     "@commitlint/types": "^21.0.1",
     "@types/bun": "^1.3.14",
     "better-auth": "^1.6.18",
+    "git-cliff": "^2.13.1",
     "typescript": "^6.0.3"
   },
   "packageManager": "bun@1.3.14"
