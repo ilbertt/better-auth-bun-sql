@@ -24,7 +24,7 @@ jobs:
 
       - name: Compute next version
         id: version
-        run: echo "version=$(./scripts/bumped-version.sh)" >> "$GITHUB_OUTPUT"
+        run: echo "version=$(bun scripts/bumped-version.ts)" >> "$GITHUB_OUTPUT"
 
       - name: Update package.json version
         env:
@@ -37,7 +37,7 @@ jobs:
           '
 
       - name: Generate changelog
-        run: ./scripts/generate-changelog.sh
+        run: bun scripts/generate-changelog.ts
 
       - name: Configure git user
         run: |
