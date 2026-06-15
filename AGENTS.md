@@ -9,6 +9,8 @@
 - **Tests:** `bun test`
 - **Commits:** Conventional Commits (commitlint)
 
+The Bun version is pinned in three places that must be bumped together: `.bun-version` (consumed by CI's `setup-bun` — keep it version-only, no comments), `packageManager` in `package.json`, and `engines.bun`.
+
 ## Code style
 
 - No comments that restate what types and naming already say — only comment the non-obvious
