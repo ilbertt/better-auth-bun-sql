@@ -35,3 +35,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # bun
 *.bun-build
+
+# stray sqlite db files from tests
+*.db
+*.db-shm
+*.db-wal

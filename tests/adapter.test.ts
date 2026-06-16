@@ -269,8 +269,8 @@ describe('dialect detection from bun:sql instances', () => {
     expect(quirks.supportsBooleans).toBe(true);
   });
 
-  it.each([':memory:', 'sqlite://my.db', 'file:my.db'])('detects sqlite from %s', (conn) => {
-    const quirks = resolveDialect(new SQL(conn));
+  it('detects sqlite from an in-memory database', () => {
+    const quirks = resolveDialect(new SQL(':memory:'));
     expect(quirks.supportsDates).toBe(false);
     expect(quirks.supportsBooleans).toBe(false);
   });
