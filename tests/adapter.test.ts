@@ -1,5 +1,8 @@
+import { rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { SQL } from 'bun';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { resolveDialect } from '#dialect.ts';
 import { type BunSqlAdapterConfig, bunSqlAdapter } from '#index.ts';
 
@@ -269,10 +272,28 @@ describe('dialect detection from bun:sql instances', () => {
     expect(quirks.supportsBooleans).toBe(true);
   });
 
-  it('detects sqlite from an in-memory database', () => {
-    const quirks = resolveDialect(new SQL(':memory:'));
+  // File-based sqlite URLs open the db on construction, so keep them in the OS
+  // temp dir (not the repo) and clean them up.
+  const sqliteUrlDb = join(tmpdir(), 'better-auth-bun-sql-url.db');
+  const sqliteFileDb = join(tmpdir(), 'better-auth-bun-sql-file.db');
+  afterAll(() => {
+    for (const f of [sqliteUrlDb, sqliteFileDb]) {
+      for (const suffix of ['', '-shm', '-wal']) {
+        rmSync(`${f}${suffix}`, { force: true });
+      }
+    }
+  });
+
+  it.each([
+    { label: ':memory:', conn: ':memory:' },
+    { label: 'sqlite:// URL', conn: `sqlite://${sqliteUrlDb}` },
+    { label: 'file: URL', conn: `file:${sqliteFileDb}` },
+  ])('detects sqlite from $label', async ({ conn }) => {
+    const sql = new SQL(conn);
+    const quirks = resolveDialect(sql);
     expect(quirks.supportsDates).toBe(false);
     expect(quirks.supportsBooleans).toBe(false);
+    await sql.close();
   });
 
   it.each(['mysql://u:p@h:3306/d', 'mariadb://u:p@h:3306/d'])('throws on %s', (conn) => {
