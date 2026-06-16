@@ -1,7 +1,7 @@
 {
   "name": "@ilbertt/better-auth-bun-sql",
   "description": "A better-auth database adapter for Bun's built-in SQL module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "ilbertt",
   "repository": {
     "type": "git",
