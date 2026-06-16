@@ -36,14 +36,6 @@ export const auth = betterAuth({
 | `usePlural` | `boolean`                 | `false`           | Pluralize table names (`user` → `users`).                                                                                                      |
 | `debugLogs` | `DBAdapterDebugLogOption` | `false`           | better-auth adapter debug logging.                                                                                                             |
 
-### Database schema
-
-Generate and apply the better-auth tables with the [better-auth CLI](https://better-auth.com/docs/concepts/cli):
-
-```sh
-bunx @better-auth/cli generate
-```
-
 ## Supported databases
 
 `bun:sql` speaks Postgres, SQLite, and MySQL/MariaDB, but this adapter supports **Postgres and SQLite only**. MySQL/MariaDB lack the `RETURNING` clause the adapter relies on for `create`/`update`, so they are intentionally unsupported (the adapter throws on a MySQL/MariaDB connection). The dialect is detected automatically from the `bun:sql` instance and can be overridden with the `dialect` option.

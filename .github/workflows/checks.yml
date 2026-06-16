@@ -40,10 +40,26 @@ jobs:
       - name: Run Tests
         run: bun run test
 
+  fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/prepare
+
+      - name: Verify schema fixtures are up to date
+        run: |
+          bun run generate:fixtures
+          git diff --exit-code tests/fixtures || {
+            echo "::error::Schema fixtures are stale. Run 'bun run generate:fixtures' and commit the result."
+            exit 1
+          }
+
   checks-passed:
     if: always()
     name: checks:required
-    needs: [types, codestyle, test]
+    needs: [types, codestyle, test, fixtures]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed

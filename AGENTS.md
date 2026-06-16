@@ -30,6 +30,10 @@ After finishing an implementation, always run:
 
 Check `package.json` scripts for other available commands.
 
+## Test fixtures
+
+`tests/fixtures/*.sql` are the canonical better-auth schema, generated from the installed better-auth by `bun run generate:fixtures` — never hand-edited. Regenerate (and commit) after bumping better-auth; CI fails if they drift.
+
 ## Run scripts
 
 When running a script, always check the `package.json` scripts for available commands first.
