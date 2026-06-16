@@ -1,6 +1,6 @@
 import { createAdapterFactory, type DBAdapterDebugLogOption } from 'better-auth/adapters';
 import type { SQL } from 'bun';
-import { type BunSqlDialect, resolveDialect } from './dialect';
+import { resolveDialect } from './dialect';
 import { type Param, QueryBuilder, qualified, quoteId, selectColumns } from './sql-builder';
 
 export interface BunSqlAdapterConfig {
@@ -12,12 +12,6 @@ export interface BunSqlAdapterConfig {
    * `search_path` — matching better-auth's first-party adapters.
    */
   schema?: string;
-  /**
-   * Override the engine detected from the `bun:sql` instance. Detection reads
-   * `sql.options.adapter` and falls back to Postgres; set this explicitly when
-   * the connection cannot be introspected (e.g. a test double).
-   */
-  dialect?: BunSqlDialect;
   /** Pluralize table names (`user` → `users`). Defaults to better-auth's `false`. */
   usePlural?: boolean;
   debugLogs?: DBAdapterDebugLogOption;
@@ -30,7 +24,7 @@ type SqlResult<T> = T[] & { count: number };
 
 export function bunSqlAdapter(config: BunSqlAdapterConfig) {
   const { sql, schema, usePlural = false, debugLogs = false } = config;
-  const quirks = resolveDialect({ sql, dialect: config.dialect });
+  const quirks = resolveDialect(sql);
 
   const run = <T>({ text, params }: { text: string; params: Param[] }): Promise<SqlResult<T>> =>
     sql.unsafe(text, params) as unknown as Promise<SqlResult<T>>;

@@ -219,11 +219,12 @@ describe('bun sql adapter', () => {
     expect(total).toBe(expectedCount);
   });
 
+  // A sqlite-reporting `options.adapter` drives the sqlite query shape.
   describe('sqlite dialect', () => {
     it('drops the ::int cast from the count projection', async () => {
       const expectedCount = 4;
-      const { sql, calls } = fakeSql({ rows: [{ count: expectedCount }] });
-      const adapter = makeAdapter({ sql, dialect: 'sqlite' });
+      const { sql, calls } = fakeSql({ rows: [{ count: expectedCount }], adapter: 'sqlite' });
+      const adapter = makeAdapter({ sql });
 
       await adapter.count({ model: 'user' });
 
@@ -231,8 +232,8 @@ describe('bun sql adapter', () => {
     });
 
     it('drops the ::text cast from case-insensitive comparisons', async () => {
-      const { sql, calls } = fakeSql({ rows: [{ id: 'u1' }] });
-      const adapter = makeAdapter({ sql, dialect: 'sqlite' });
+      const { sql, calls } = fakeSql({ rows: [{ id: 'u1' }], adapter: 'sqlite' });
+      const adapter = makeAdapter({ sql });
 
       await adapter.findOne({
         model: 'user',
@@ -245,20 +246,9 @@ describe('bun sql adapter', () => {
     });
   });
 
-  describe('dialect detection', () => {
-    it('detects sqlite from sql.options.adapter', async () => {
-      const { sql, calls } = fakeSql({ rows: [{ count: 0 }], adapter: 'sqlite' });
-      const adapter = makeAdapter({ sql });
-
-      await adapter.count({ model: 'user' });
-
-      expect(last(calls).text).toBe('SELECT count(*) AS count FROM "user"');
-    });
-
-    it('throws on an unsupported engine', () => {
-      const { sql } = fakeSql({ adapter: 'mysql' });
-      expect(() => makeAdapter({ sql })).toThrow(/only Postgres and SQLite/);
-    });
+  it('throws on an unsupported engine', () => {
+    const { sql } = fakeSql({ adapter: 'mysql' });
+    expect(() => makeAdapter({ sql })).toThrow(/only Postgres and SQLite/);
   });
 });
 
@@ -274,18 +264,18 @@ describe('dialect detection from bun:sql instances', () => {
       make: () => new SQL({ hostname: 'h', database: 'd' } as never),
     },
   ])('detects postgres from $label', ({ make }) => {
-    const quirks = resolveDialect({ sql: make() });
+    const quirks = resolveDialect(make());
     expect(quirks.supportsDates).toBe(true);
     expect(quirks.supportsBooleans).toBe(true);
   });
 
   it.each([':memory:', 'sqlite://my.db', 'file:my.db'])('detects sqlite from %s', (conn) => {
-    const quirks = resolveDialect({ sql: new SQL(conn) });
+    const quirks = resolveDialect(new SQL(conn));
     expect(quirks.supportsDates).toBe(false);
     expect(quirks.supportsBooleans).toBe(false);
   });
 
   it.each(['mysql://u:p@h:3306/d', 'mariadb://u:p@h:3306/d'])('throws on %s', (conn) => {
-    expect(() => resolveDialect({ sql: new SQL(conn) })).toThrow(/only Postgres and SQLite/);
+    expect(() => resolveDialect(new SQL(conn))).toThrow(/only Postgres and SQLite/);
   });
 });

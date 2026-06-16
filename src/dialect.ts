@@ -50,16 +50,10 @@ function detectDialect(sql: SQL): BunSqlDialect {
     return 'postgres';
   }
   throw new Error(
-    `@ilbertt/better-auth-bun-sql supports only Postgres and SQLite, but the connected bun:sql adapter is "${adapter}". Pass an explicit \`dialect\` if detection is wrong.`,
+    `@ilbertt/better-auth-bun-sql supports only Postgres and SQLite, but the connected bun:sql adapter is "${adapter}".`,
   );
 }
 
-export function resolveDialect({
-  sql,
-  dialect,
-}: {
-  sql: SQL;
-  dialect?: BunSqlDialect;
-}): DialectQuirks {
-  return QUIRKS[dialect ?? detectDialect(sql)];
+export function resolveDialect(sql: SQL): DialectQuirks {
+  return QUIRKS[detectDialect(sql)];
 }

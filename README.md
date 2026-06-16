@@ -30,15 +30,14 @@ export const auth = betterAuth({
 
 | Option      | Type                      | Default           | Description                                                                                                                                     |
 | ----------- | ------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sql`       | `SQL`                     | —                 | **Required.** A `bun:sql` instance connected to a Postgres or SQLite database.                                                                  |
-| `schema`    | `string`                  | _(unqualified)_   | Database schema (namespace) the tables live in. When omitted, table names are unqualified and resolved against the connection's `search_path`. |
-| `dialect`   | `'postgres' \| 'sqlite'`  | _(auto-detected)_ | Overrides the engine detected from `sql.options.adapter`. Detection falls back to Postgres when the instance can't be introspected.            |
-| `usePlural` | `boolean`                 | `false`           | Pluralize table names (`user` → `users`).                                                                                                      |
-| `debugLogs` | `DBAdapterDebugLogOption` | `false`           | better-auth adapter debug logging.                                                                                                             |
+| `sql`       | `SQL`                     | -       | **Required.** A `bun:sql` instance connected to a Postgres or SQLite database.                                                                 |
+| `schema`    | `string`                  | -       | Database schema (namespace) the tables live in. When omitted, table names are unqualified and resolved against the connection's `search_path`. |
+| `usePlural` | `boolean`                 | `false` | Pluralize table names (`user` → `users`).                                                                                                     |
+| `debugLogs` | `DBAdapterDebugLogOption` | `false` | better-auth adapter debug logging.                                                                                                            |
 
 ## Supported databases
 
-`bun:sql` speaks Postgres, SQLite, and MySQL/MariaDB, but this adapter supports **Postgres and SQLite only**. MySQL/MariaDB lack the `RETURNING` clause the adapter relies on for `create`/`update`, so they are intentionally unsupported (the adapter throws on a MySQL/MariaDB connection). The dialect is detected automatically from the `bun:sql` instance and can be overridden with the `dialect` option.
+`bun:sql` speaks Postgres, SQLite, and MySQL/MariaDB, but this adapter supports **Postgres and SQLite only**. MySQL/MariaDB lack the `RETURNING` clause the adapter relies on for `create`/`update`, so they are intentionally unsupported (the adapter throws on a MySQL/MariaDB connection). The dialect is detected automatically from the `bun:sql` instance.
 
 ## Requirements
 
