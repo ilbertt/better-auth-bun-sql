@@ -8,6 +8,8 @@ cd better-auth-bun-sql
 bun install
 ```
 
+The test suite runs against a real Postgres in Docker, so **Docker must be running** — `bun test` brings the container up and down automatically (`compose.yaml`).
+
 ## Validation
 
 Before opening a PR, make sure the following pass:
