@@ -1,9 +1,16 @@
 import { Database } from 'bun:sqlite';
 import { join } from 'node:path';
-import { PGlite } from '@electric-sql/pglite';
 import { getMigrations } from 'better-auth/db/migration';
+import { $ } from 'bun';
+import { PostgresDialect } from 'kysely';
+import { Pool } from 'pg';
 import betterAuthPkg from '../node_modules/better-auth/package.json' with { type: 'json' };
-import { pgliteKyselyDialect } from '../tests/support/pglite.ts';
+import { databaseUrl, POSTGRES_TARGETS } from '../tests/support/postgres.ts';
+
+// The emitted DDL is the same on every Postgres major, so introspect against the
+// newest container the test suite runs.
+const newestTarget = POSTGRES_TARGETS.at(-1) as (typeof POSTGRES_TARGETS)[number];
+const POSTGRES_URL = databaseUrl({ port: newestTarget.port, name: 'postgres' });
 
 const fixturesDir = join(import.meta.dir, '..', 'tests', 'fixtures');
 const betterAuthVersion = betterAuthPkg.version;
@@ -35,11 +42,19 @@ const sqliteDb = new Database(':memory:');
 const sqliteDdl = await compile({ database: sqliteDb });
 sqliteDb.close();
 
-const pg = new PGlite();
-const postgresDdl = await compile({
-  database: { dialect: pgliteKyselyDialect(pg), type: 'postgres' },
-});
-await pg.close();
+// Postgres DDL is introspected from a clean Postgres via better-auth's Kysely
+// migrator (pg driver) — the same engine the test suite runs against.
+await $`docker compose up -d --wait`;
+const pool = new Pool({ connectionString: POSTGRES_URL });
+let postgresDdl: string;
+try {
+  postgresDdl = await compile({
+    database: { dialect: new PostgresDialect({ pool }), type: 'postgres' },
+  });
+} finally {
+  await pool.end();
+  await $`docker compose down -v`;
+}
 
 await writeFixture({ engine: 'SQLite', ddl: sqliteDdl });
 await writeFixture({ engine: 'Postgres', ddl: postgresDdl });

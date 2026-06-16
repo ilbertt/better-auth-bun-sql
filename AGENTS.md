@@ -6,7 +6,7 @@
 
 - **Runtime:** Bun (the adapter relies on `bun:sql` and is Bun-only)
 - **Linter/Formatter:** Biome (auto-formats on save)
-- **Tests:** vitest — run with `bun run test` (imports from `vitest`, not `bun:test`)
+- **Tests:** vitest — run with `bun run test` (imports from `vitest`, not `bun:test`). Postgres tests run against real Postgres in Docker (`compose.yaml`), brought up/down once by vitest's `globalSetup` (`tests/support/global-setup.ts`) — **Docker must be running** locally. Every Postgres test runs against all supported majors (16/17/18), one container each, on hardcoded unusual host ports (543 + major, e.g. `54318`) — defined once in `POSTGRES_TARGETS` (`tests/support/postgres.ts`); no `DATABASE_URL` env var. SQLite tests use an in-memory `bun:sql` connection (no Docker). Each Postgres test file gets its own database per target via `createDatabase`/`dropDatabase` so parallel files stay isolated. The conformance suite (`@better-auth/test-utils`) rebuilds the schema between tests and drives the migrator through `pg` + Kysely; the adapter under test always uses `bun:sql`.
 - **Commits:** Conventional Commits (commitlint)
 
 The Bun version is pinned in three places that must be bumped together: `.bun-version` (consumed by CI's `setup-bun` — keep it version-only, no comments), `packageManager` in `package.json`, and `engines.bun`.
@@ -32,7 +32,7 @@ Check `package.json` scripts for other available commands.
 
 ## Test fixtures
 
-`tests/fixtures/*.sql` are the canonical better-auth schema, generated from the installed better-auth by `bun run generate:fixtures` — never hand-edited. Regenerate (and commit) after bumping better-auth; CI fails if they drift.
+`tests/fixtures/*.sql` are the canonical better-auth schema, generated from the installed better-auth by `bun run generate:fixtures` — never hand-edited. The Postgres fixture is introspected from the Docker Postgres (the script manages the container itself), so **Docker must be running**. Regenerate (and commit) after bumping better-auth; CI fails if they drift.
 
 ## Run scripts
 
