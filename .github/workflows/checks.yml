@@ -38,12 +38,23 @@ jobs:
       - uses: ./.github/actions/prepare
 
       - name: Run Tests
-        run: bun test
+        run: bun run test
+
+  fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/prepare
+
+      - name: Verify schema fixtures are up to date
+        run: bun run check:fixtures
 
   checks-passed:
     if: always()
     name: checks:required
-    needs: [types, codestyle, test]
+    needs: [types, codestyle, test, fixtures]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed

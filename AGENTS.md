@@ -6,7 +6,7 @@
 
 - **Runtime:** Bun (the adapter relies on `bun:sql` and is Bun-only)
 - **Linter/Formatter:** Biome (auto-formats on save)
-- **Tests:** `bun test`
+- **Tests:** vitest — run with `bun run test` (imports from `vitest`, not `bun:test`)
 - **Commits:** Conventional Commits (commitlint)
 
 The Bun version is pinned in three places that must be bumped together: `.bun-version` (consumed by CI's `setup-bun` — keep it version-only, no comments), `packageManager` in `package.json`, and `engines.bun`.
@@ -25,10 +25,14 @@ After finishing an implementation, always run:
 
 1. `bun fix:codestyle` — auto-fix formatting/lint issues
 2. `bun check:all` — verify types and codestyle pass
-3. `bun test` — run the test suite
+3. `bun run test` — run the test suite (vitest, via `bun --bun vitest run`)
 4. `bun run build` — verify the build succeeds
 
 Check `package.json` scripts for other available commands.
+
+## Test fixtures
+
+`tests/fixtures/*.sql` are the canonical better-auth schema, generated from the installed better-auth by `bun run generate:fixtures` — never hand-edited. Regenerate (and commit) after bumping better-auth; CI fails if they drift.
 
 ## Run scripts
 
