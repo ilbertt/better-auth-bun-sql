@@ -1,6 +1,6 @@
 # @ilbertt/better-auth-bun-sql
 
-A [better-auth](https://better-auth.com) database adapter for Bun's built-in SQL module ([`bun:sql`](https://bun.sh/docs/api/sql)).
+A [better-auth](https://better-auth.com) database adapter for Bun's built-in SQL module ([`bun:sql`](https://bun.com/docs/runtime/sql)).
 
 ## Installation
 
@@ -8,7 +8,7 @@ A [better-auth](https://better-auth.com) database adapter for Bun's built-in SQL
 bun add @ilbertt/better-auth-bun-sql
 ```
 
-> Requires [Bun](https://bun.sh) — this adapter relies on the `bun:sql` runtime module and does not work on Node.js.
+> Requires [Bun](https://bun.com) — this adapter relies on the `bun:sql` runtime module and does not work on Node.js.
 
 ## Usage
 
@@ -38,10 +38,6 @@ export const auth = betterAuth({
 ## Supported databases
 
 `bun:sql` speaks Postgres, SQLite, and MySQL/MariaDB, but this adapter supports **Postgres and SQLite only**. MySQL/MariaDB lack the `RETURNING` clause the adapter relies on for `create`/`update`, so they are intentionally unsupported (the adapter throws on a MySQL/MariaDB connection). The dialect is detected automatically from the `bun:sql` instance.
-
-## Requirements
-
-- [Bun](https://bun.sh)
 
 ## Contributing
 
