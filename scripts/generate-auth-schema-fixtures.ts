@@ -5,9 +5,12 @@ import { $ } from 'bun';
 import { PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
 import betterAuthPkg from '../node_modules/better-auth/package.json' with { type: 'json' };
+import { databaseUrl, POSTGRES_TARGETS } from '../tests/support/postgres.ts';
 
-const POSTGRES_URL =
-  process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5433/postgres';
+// The emitted DDL is the same on every Postgres major, so introspect against the
+// newest container the test suite runs.
+const newestTarget = POSTGRES_TARGETS.at(-1) as (typeof POSTGRES_TARGETS)[number];
+const POSTGRES_URL = databaseUrl({ port: newestTarget.port, name: 'postgres' });
 
 const fixturesDir = join(import.meta.dir, '..', 'tests', 'fixtures');
 const betterAuthVersion = betterAuthPkg.version;

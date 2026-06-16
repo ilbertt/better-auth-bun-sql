@@ -1,30 +1,38 @@
 import { SQL } from 'bun';
 
-// Connection to the Postgres started by globalSetup. Overridable so CI or a
-// developer can point the suite at a different instance.
-const ADMIN_URL =
-  process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5433/postgres';
+export type PostgresTarget = { version: number; port: number };
 
-export function databaseUrl(name: string): string {
-  const url = new URL(ADMIN_URL);
-  url.pathname = `/${name}`;
-  return url.toString();
+// The Postgres versions the suite runs against, one container each (see
+// compose.yaml). Ports are hardcoded — we own the containers, so there's no
+// need for a DATABASE_URL env var — and deliberately unusual (543 + version) to
+// avoid clashing with anything a developer already runs locally.
+export const POSTGRES_TARGETS: PostgresTarget[] = [
+  { version: 16, port: 54316 },
+  { version: 17, port: 54317 },
+  { version: 18, port: 54318 },
+];
+
+const connectionString = ({ port, name }: { port: number; name: string }): string =>
+  `postgres://postgres:postgres@localhost:${port}/${name}`;
+
+export function databaseUrl(target: { port: number; name: string }): string {
+  return connectionString(target);
 }
 
-// Each test file gets its own freshly-created database, so files stay isolated
-// even when vitest runs them in parallel against the shared server. Returns a
-// `bun:sql` connection to the new database — the same driver users connect with,
-// so query rendering, type coercion and affected-row counts are exercised for real.
-export async function createDatabase(name: string): Promise<SQL> {
-  const admin = new SQL(ADMIN_URL);
+// Each test file gets its own freshly-created database on each target server, so
+// files stay isolated even when vitest runs them in parallel. Returns a `bun:sql`
+// connection — the same driver users connect with, so query rendering, type
+// coercion and affected-row counts are exercised for real.
+export async function createDatabase({ port, name }: { port: number; name: string }): Promise<SQL> {
+  const admin = new SQL(connectionString({ port, name: 'postgres' }));
   await admin.unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
   await admin.unsafe(`CREATE DATABASE "${name}"`);
   await admin.close();
-  return new SQL(databaseUrl(name));
+  return new SQL(connectionString({ port, name }));
 }
 
-export async function dropDatabase(name: string): Promise<void> {
-  const admin = new SQL(ADMIN_URL);
+export async function dropDatabase({ port, name }: { port: number; name: string }): Promise<void> {
+  const admin = new SQL(connectionString({ port, name: 'postgres' }));
   await admin.unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
   await admin.close();
 }

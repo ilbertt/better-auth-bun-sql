@@ -1,18 +1,32 @@
-# Postgres used by the test suite. Brought up/down automatically by vitest's
-# globalSetup (tests/support/global-setup.ts), so local and CI share one env.
+# Postgres servers used by the test suite — one per supported major version, so
+# every `bun test` proves the adapter across all of them. Brought up/down
+# automatically by vitest's globalSetup (tests/support/global-setup.ts), so local
+# and CI share one env. Host ports mirror tests/support/postgres.ts (543 + major
+# version) and are deliberately unusual to avoid clashing with a local Postgres.
+x-postgres: &postgres
+  environment:
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    POSTGRES_DB: postgres
+  healthcheck:
+    test: ['CMD-SHELL', 'pg_isready -U postgres -d postgres']
+    interval: 1s
+    timeout: 5s
+    retries: 30
+
 services:
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
-    # Host port 5433 (not the default 5432) to avoid clashing with a Postgres a
-    # developer may already run locally. Override with the host side if needed.
+  postgres-16:
+    <<: *postgres
+    image: postgres:16-alpine
     ports:
-      - '5433:5432'
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d postgres']
-      interval: 1s
-      timeout: 5s
-      retries: 30
+      - '54316:5432'
+  postgres-17:
+    <<: *postgres
+    image: postgres:17-alpine
+    ports:
+      - '54317:5432'
+  postgres-18:
+    <<: *postgres
+    image: postgres:18-alpine
+    ports:
+      - '54318:5432'
