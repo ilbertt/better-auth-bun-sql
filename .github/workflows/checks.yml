@@ -49,12 +49,7 @@ jobs:
       - uses: ./.github/actions/prepare
 
       - name: Verify schema fixtures are up to date
-        run: |
-          bun run generate:fixtures
-          git diff --exit-code tests/fixtures || {
-            echo "::error::Schema fixtures are stale. Run 'bun run generate:fixtures' and commit the result."
-            exit 1
-          }
+        run: bun run check:fixtures
 
   checks-passed:
     if: always()

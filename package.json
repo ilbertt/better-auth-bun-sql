@@ -36,6 +36,7 @@
     "test": "bun --bun vitest run",
     "check:types": "bun run --bun tsc",
     "check:codestyle": "bun run --bun biome check",
+    "check:fixtures": "bun run scripts/check-fixtures.ts",
     "check:all": "bun check:types && bun check:codestyle",
     "check:commit-message": "bun run --bun commitlint",
     "fix:codestyle": "bun run --bun biome check --write"
