@@ -36,6 +36,12 @@ export interface DialectDdl {
  * engine's native type support.
  */
 export interface DialectQuirks {
+  /**
+   * Whether the engine has schemas (namespaces) to qualify table names with.
+   * SQLite does not — there a qualified name addresses an `ATTACH`ed database —
+   * so the `pgSchema` option is ignored on it.
+   */
+  supportsSchemas: boolean;
   /** SQLite has no native date type, so dates round-trip as ISO strings. */
   supportsDates: boolean;
   /** SQLite has no native boolean type, so booleans round-trip as 0/1. */
@@ -49,6 +55,7 @@ export interface DialectQuirks {
 
 const QUIRKS: Record<BunSqlDialect, DialectQuirks> = {
   postgres: {
+    supportsSchemas: true,
     supportsDates: true,
     supportsBooleans: true,
     countExpression: 'count(*)::int',
@@ -61,6 +68,7 @@ const QUIRKS: Record<BunSqlDialect, DialectQuirks> = {
     },
   },
   sqlite: {
+    supportsSchemas: false,
     supportsDates: false,
     supportsBooleans: false,
     countExpression: 'count(*)',

@@ -127,11 +127,33 @@ describe('createSchema', () => {
   });
 
   it('qualifies tables, foreign keys and indexes with the configured schema', async () => {
-    const { code } = await generateSchema({ config: { sql: postgres, schema: 'app_auth' } });
+    const { code } = await generateSchema({ config: { sql: postgres, pgSchema: 'app_auth' } });
 
     expect(code).toContain('create table "app_auth"."user" (');
     expect(code).toContain('references "app_auth"."user" ("id") on delete cascade');
     expect(code).toContain('create index "session_userId_idx" on "app_auth"."session" ("userId")');
+  });
+
+  it('prefixes table, foreign key and index names when tablesPrefix is set', async () => {
+    const { code } = await generateSchema({
+      config: { sql: postgres, pgSchema: 'app_auth', tablesPrefix: 'auth_' },
+    });
+
+    expect(code).toContain('create table "app_auth"."auth_user" (');
+    expect(code).toContain('references "app_auth"."auth_user" ("id") on delete cascade');
+    expect(code).toContain(
+      'create index "auth_session_userId_idx" on "app_auth"."auth_session" ("userId")',
+    );
+  });
+
+  it('drops the schema qualification on sqlite, where schemas do not exist', async () => {
+    const { code } = await generateSchema({
+      config: { sql: sqlite, pgSchema: 'app_auth', tablesPrefix: 'auth_' },
+    });
+
+    expect(code).not.toContain('app_auth');
+    expect(code).toContain('create table "auth_user" (');
+    expect(code).toContain('references "auth_user" ("id") on delete cascade');
   });
 
   it('pluralises table, foreign key and index names when usePlural is set', async () => {
@@ -212,7 +234,7 @@ describe('generated sqlite schema round-trips through the adapter', () => {
 
   it('writes and reads back every generated column type', async () => {
     const sql = new SQL(':memory:');
-    const config = { sql, usePlural: true };
+    const config = { sql, usePlural: true, tablesPrefix: 'auth_' };
     const { code } = await generateSchema({ config, options });
     await sql.unsafe(code, []);
 
@@ -234,8 +256,9 @@ describe('generated sqlite schema round-trips through the adapter', () => {
       },
     });
 
-    // `usePlural` was honoured by the DDL and by the adapter, so both agree.
-    const [row] = await sql.unsafe('SELECT count(*) AS total FROM "users"', []);
+    // `usePlural` and `tablesPrefix` were honoured by the DDL and by the adapter,
+    // so both agree on the table name.
+    const [row] = await sql.unsafe('SELECT count(*) AS total FROM "auth_users"', []);
     expect(row?.total).toBe(1);
 
     const found = await adapter.findOne<typeof created>({

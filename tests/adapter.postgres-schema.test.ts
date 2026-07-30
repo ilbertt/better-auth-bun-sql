@@ -29,7 +29,7 @@ for (const target of POSTGRES_TARGETS) {
       await sql.unsafe(
         `CREATE SCHEMA "${AUTH_SCHEMA}"; SET search_path TO "${AUTH_SCHEMA}";\n${ddl}`,
       );
-      adapter = bunSqlAdapter({ sql, schema: AUTH_SCHEMA })(
+      adapter = bunSqlAdapter({ sql, pgSchema: AUTH_SCHEMA })(
         {} as Parameters<ReturnType<typeof bunSqlAdapter>>[0],
       );
     }, SETUP_TIMEOUT_MS);

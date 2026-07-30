@@ -8,10 +8,13 @@ import { createDatabase, dropDatabase, POSTGRES_TARGETS } from './support/postgr
 // The generated DDL, executed on a real Postgres and then driven through the full
 // CRUD suite. `adapter.postgres-schema.test.ts` does the same against the
 // committed fixture; this proves the schema the adapter *generates* is one it can
-// also use — including the schema qualification no fixture can express.
+// also use — including the schema qualification and table prefix no fixture can
+// express.
 const DB_NAME = 'better_auth_generated_schema';
 
 const AUTH_SCHEMA = 'app_auth';
+
+const TABLES_PREFIX = 'auth_';
 
 const SETUP_TIMEOUT_MS = 30_000;
 
@@ -22,7 +25,7 @@ for (const target of POSTGRES_TARGETS) {
 
     beforeAll(async () => {
       sql = await createDatabase({ port: target.port, name: DB_NAME });
-      const config = { sql, schema: AUTH_SCHEMA };
+      const config = { sql, pgSchema: AUTH_SCHEMA, tablesPrefix: TABLES_PREFIX };
       const { code } = await generateSchema({ config });
       // The generated statements are schema-qualified, so the schema only has to
       // exist — no search_path juggling.
@@ -36,7 +39,7 @@ for (const target of POSTGRES_TARGETS) {
     });
 
     registerCrudSuite({
-      name: `bun-sql adapter against its own generated schema in "${AUTH_SCHEMA}"`,
+      name: `bun-sql adapter against its own generated schema in "${AUTH_SCHEMA}" with the "${TABLES_PREFIX}" table prefix`,
       getAdapter: () => adapter,
     });
   });

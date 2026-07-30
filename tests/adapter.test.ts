@@ -57,7 +57,7 @@ describe('bun sql adapter', () => {
 
   it('builds a schema-qualified INSERT ... RETURNING with one placeholder per column', async () => {
     const { sql, calls } = fakeSql({ rows: [{ id: 'u1' }] });
-    const adapter = makeAdapter({ sql, schema: 'auth' });
+    const adapter = makeAdapter({ sql, pgSchema: 'auth' });
 
     await adapter.create({
       model: 'user',
@@ -80,6 +80,25 @@ describe('bun sql adapter', () => {
     expect(params).toHaveLength(columns.length);
     expect(params[columns.indexOf('"email"')]).toBe('a@onfabric.io');
     expect(params[columns.indexOf('"emailVerified"')]).toBe(true);
+  });
+
+  it('prefixes table names with tablesPrefix, under the schema when both are set', async () => {
+    const { sql, calls } = fakeSql({ rows: [{ id: 'u1' }] });
+    const adapter = makeAdapter({ sql, tablesPrefix: 'auth_' });
+
+    await adapter.findOne({ model: 'user', where: [{ field: 'id', value: 'u1' }] });
+    expect(last(calls).text).toBe('SELECT * FROM "auth_user" WHERE "id" = $1 LIMIT 1');
+
+    const both = fakeSql({ rows: [{ id: 'u1' }] });
+    const qualifiedAdapter = makeAdapter({
+      sql: both.sql,
+      pgSchema: 'app_auth',
+      tablesPrefix: 'auth_',
+    });
+    await qualifiedAdapter.count({ model: 'session' });
+    expect(last(both.calls).text).toBe(
+      'SELECT count(*)::int AS count FROM "app_auth"."auth_session"',
+    );
   });
 
   it('renders eq/null/AND in findOne and selects requested columns', async () => {
@@ -232,6 +251,17 @@ describe('bun sql adapter', () => {
       await adapter.count({ model: 'user' });
 
       expect(last(calls).text).toBe('SELECT count(*) AS count FROM "user"');
+    });
+
+    // SQLite has no schemas — a qualified name there would address an ATTACHed
+    // database — so `pgSchema` is dropped and `tablesPrefix` takes its place.
+    it('ignores pgSchema but still applies tablesPrefix', async () => {
+      const { sql, calls } = fakeSql({ rows: [{ count: 0 }], adapter: 'sqlite' });
+      const adapter = makeAdapter({ sql, pgSchema: 'app_auth', tablesPrefix: 'auth_' });
+
+      await adapter.count({ model: 'user' });
+
+      expect(last(calls).text).toBe('SELECT count(*) AS count FROM "auth_user"');
     });
 
     it('drops the ::text cast from case-insensitive comparisons', async () => {

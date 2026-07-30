@@ -16,6 +16,7 @@ The Bun version is pinned in three places that must be bumped together: `.bun-ve
 - No comments that restate what types and naming already say — only comment the non-obvious
 - Imports use `#*` subpath mapping (e.g. `import { foo } from '#services/foo'` → `src/services/foo`)
 - Single source of truth — never duplicate keys, enum values, or type info that belongs to a class/module; derive from the source instead
+- Declare functions with `function foo() {}`, not `const foo = () => {}`, wherever a declaration is possible
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object
 - Only re-export from index files — Biome enforces that (`noBarrelFile`)
 

@@ -1,6 +1,6 @@
 import type { BetterAuthDBSchema, DBFieldAttribute } from 'better-auth/db';
 import type { DialectQuirks } from './dialect';
-import { qualified, quoteId } from './sql-builder';
+import { prefixed, qualified, quoteId } from './sql-builder';
 
 /** Column types spelled the same way on Postgres and SQLite. */
 const TEXT = 'text';
@@ -28,7 +28,8 @@ type GetColumn = (props: { model: string; field: string }) => string;
 type DdlContext = {
   quirks: DialectQuirks;
   idStrategy: IdStrategy;
-  schema: string | undefined;
+  pgSchema: string | undefined;
+  /** Resolves a model to its final, already-prefixed table name. */
   getTable: GetTable;
   getColumn: GetColumn;
 };
@@ -108,7 +109,10 @@ function columnDefinition({
   }
   const { references } = field;
   if (references) {
-    const target = qualified({ schema: context.schema, model: context.getTable(references.model) });
+    const target = qualified({
+      pgSchema: context.pgSchema,
+      table: context.getTable(references.model),
+    });
     const targetColumn = context.getColumn({
       model: references.model,
       field: references.field,
@@ -137,7 +141,7 @@ function createIndexStatement({
   context: DdlContext;
 }): string {
   const name = quoteId(`${table}_${column}_${unique ? 'uidx' : 'idx'}`);
-  const on = qualified({ schema: context.schema, model: table });
+  const on = qualified({ pgSchema: context.pgSchema, table });
   return `create ${unique ? 'unique ' : ''}index ${name} on ${on} (${quoteId(column)})`;
 }
 
@@ -150,20 +154,34 @@ function createIndexStatement({
  */
 export function buildSchemaDdl({
   tables,
-  schema,
+  pgSchema,
+  tablesPrefix,
   quirks,
   idStrategy,
   getTable,
   getColumn,
 }: {
   tables: BetterAuthDBSchema;
-  schema: string | undefined;
+  pgSchema: string | undefined;
+  tablesPrefix: string | undefined;
   quirks: DialectQuirks;
   idStrategy: IdStrategy;
   getTable: GetTable;
   getColumn: GetColumn;
 }): string {
-  const context: DdlContext = { quirks, idStrategy, schema, getTable, getColumn };
+  // Applied once here rather than at every reference so index names carry the
+  // prefix too — on SQLite they share one namespace with every other table.
+  function prefixedTable(model: string): string {
+    return prefixed({ tablesPrefix, table: getTable(model) });
+  }
+
+  const context: DdlContext = {
+    quirks,
+    idStrategy,
+    pgSchema,
+    getTable: prefixedTable,
+    getColumn,
+  };
   // Models keyed separately can resolve to one table — a plugin extending `user`
   // declares `modelName: 'user'` — so definitions are merged by table name.
   const definitions = new Map<string, TableDefinition>();
@@ -172,7 +190,7 @@ export function buildSchemaDdl({
   // flag but reads it nowhere, so skipping those tables would omit tables its own
   // generator emits — a user who owns a table can drop the statement instead.
   for (const [model, { fields, order }] of Object.entries(tables)) {
-    const table = getTable(model);
+    const table = context.getTable(model);
     let definition = definitions.get(table);
     if (!definition) {
       definition = {
@@ -213,7 +231,7 @@ export function buildSchemaDdl({
   const statements = [
     ...ordered.map(
       ({ table, columns }) =>
-        `create table ${qualified({ schema, model: table })} (${columns.join(', ')})`,
+        `create table ${qualified({ pgSchema, table })} (${columns.join(', ')})`,
     ),
     ...ordered.flatMap(({ indexes }) => indexes),
   ];

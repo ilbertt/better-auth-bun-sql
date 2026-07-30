@@ -7,9 +7,27 @@ export function quoteId(identifier: string): string {
   return `"${identifier.replaceAll('"', '""')}"`;
 }
 
-export function qualified({ schema, model }: { schema?: string; model: string }): string {
-  const table = quoteId(model);
-  return schema ? `${quoteId(schema)}.${table}` : table;
+/** Prepends the configured prefix to a table name. */
+export function prefixed({
+  tablesPrefix,
+  table,
+}: {
+  tablesPrefix: string | undefined;
+  table: string;
+}): string {
+  return tablesPrefix ? `${tablesPrefix}${table}` : table;
+}
+
+/** Renders a table reference; `table` is expected to already carry its prefix. */
+export function qualified({
+  pgSchema,
+  table,
+}: {
+  pgSchema: string | undefined;
+  table: string;
+}): string {
+  const quoted = quoteId(table);
+  return pgSchema ? `${quoteId(pgSchema)}.${quoted}` : quoted;
 }
 
 /** Maps a better-auth model field name to its database column name. */
