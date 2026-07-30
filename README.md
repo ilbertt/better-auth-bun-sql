@@ -31,9 +31,19 @@ export const auth = betterAuth({
 | Option      | Type                      | Default           | Description                                                                                                                                     |
 | ----------- | ------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | `sql`       | `SQL`                     | -       | **Required.** A `bun:sql` instance connected to a Postgres or SQLite database.                                                                 |
-| `schema`    | `string`                  | -       | Database schema (namespace) the tables live in. When omitted, table names are unqualified and resolved against the connection's `search_path`. |
+| `schema`    | `string`                  | -       | Database schema (namespace) the tables live in. When omitted, table names are unqualified and resolved against the connection's `search_path`. SQLite has no schemas, so there it only works against an `ATTACH`ed database of that name. |
 | `usePlural` | `boolean`                 | `false` | Pluralize table names (`user` → `users`).                                                                                                     |
 | `debugLogs` | `DBAdapterDebugLogOption` | `false` | better-auth adapter debug logging.                                                                                                            |
+
+## Generating the schema
+
+The adapter implements better-auth's [`createSchema`](https://better-auth.com/docs/guides/create-a-db-adapter#createschema-optional), so [`@better-auth/cli`](https://www.better-auth.com/docs/concepts/cli) can generate the SQL for the tables better-auth expects — into `./auth-schema.sql`, or wherever `--output` points:
+
+```sh
+bun run --bun better-auth generate --config src/auth.ts
+```
+
+Run the CLI with `--bun`. Its executable has a Node shebang, so without the flag it won't run on the Bun runtime this package needs.
 
 ## Supported databases
 
