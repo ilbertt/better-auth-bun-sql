@@ -1,6 +1,7 @@
 import { createAdapterFactory, type DBAdapterDebugLogOption } from 'better-auth/adapters';
 import type { SQL } from 'bun';
 import { resolveDialect } from './dialect';
+import { buildSchemaDdl, DEFAULT_SCHEMA_FILE } from './schema-builder';
 import { type Param, QueryBuilder, qualified, quoteId, selectColumns } from './sql-builder';
 
 export interface BunSqlAdapterConfig {
@@ -44,7 +45,7 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
     // `data`/`update` keys arrive already mapped to column names by the factory,
     // but `where`/`select`/`sortBy` carry model field names — so those are mapped
     // to columns here via `getFieldName`.
-    adapter: ({ getFieldName }) => ({
+    adapter: ({ options, getModelName, getFieldName }) => ({
       create: async ({ model, data }) => {
         const entries = Object.entries(data);
         const builder = new QueryBuilder({
@@ -145,6 +146,23 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
         });
         return result.count;
       },
+
+      // Backs `@better-auth/cli generate`, which has built-in generators only for
+      // Prisma/Drizzle/Kysely and asks every other adapter for its own schema.
+      // `overwrite` is left unset so the CLI asks whether to write the file
+      // instead of claiming it already exists.
+      createSchema: ({ file, tables }) =>
+        Promise.resolve({
+          code: buildSchemaDdl({
+            tables,
+            schema,
+            quirks,
+            idStrategy: options.advanced?.database?.generateId === 'serial' ? 'serial' : 'text',
+            getTable: getModelName,
+            getColumn: getFieldName,
+          }),
+          path: file ?? DEFAULT_SCHEMA_FILE,
+        }),
     }),
   });
 }
