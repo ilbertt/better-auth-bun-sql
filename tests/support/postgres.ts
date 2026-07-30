@@ -12,27 +12,22 @@ export const POSTGRES_TARGETS: PostgresTarget[] = [
   { version: 18, port: 54318 },
 ];
 
-const connectionString = ({ port, name }: { port: number; name: string }): string =>
-  `postgres://postgres:postgres@localhost:${port}/${name}`;
-
-export function databaseUrl(target: { port: number; name: string }): string {
-  return connectionString(target);
+export function databaseUrl({ port, name }: { port: number; name: string }): string {
+  return `postgres://postgres:postgres@localhost:${port}/${name}`;
 }
 
-// Each test file gets its own freshly-created database on each target server, so
-// files stay isolated even when vitest runs them in parallel. Returns a `bun:sql`
-// connection — the same driver users connect with, so query rendering, type
-// coercion and affected-row counts are exercised for real.
+// One database per test file per target, so files stay isolated even when vitest
+// runs them in parallel.
 export async function createDatabase({ port, name }: { port: number; name: string }): Promise<SQL> {
-  const admin = new SQL(connectionString({ port, name: 'postgres' }));
+  const admin = new SQL(databaseUrl({ port, name: 'postgres' }));
   await admin.unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
   await admin.unsafe(`CREATE DATABASE "${name}"`);
   await admin.close();
-  return new SQL(connectionString({ port, name }));
+  return new SQL(databaseUrl({ port, name }));
 }
 
 export async function dropDatabase({ port, name }: { port: number; name: string }): Promise<void> {
-  const admin = new SQL(connectionString({ port, name: 'postgres' }));
+  const admin = new SQL(databaseUrl({ port, name: 'postgres' }));
   await admin.unsafe(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`);
   await admin.close();
 }

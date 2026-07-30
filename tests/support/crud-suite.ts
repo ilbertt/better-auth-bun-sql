@@ -1,11 +1,15 @@
-import { describe, expect, it } from 'vitest';
-import type { bunSqlAdapter } from '#index.ts';
-
-type Adapter = ReturnType<ReturnType<typeof bunSqlAdapter>>;
+import type { SQL } from 'bun';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { BunSqlAdapterConfig } from '#index.ts';
+import { type Adapter, makeAdapter } from './adapter.ts';
+import type { Engine } from './engines.ts';
 
 const ONE_HOUR_MS = 3_600_000;
 
-export function newUser() {
+// Creating a database and running the DDL goes over the network to a container.
+const SETUP_TIMEOUT_MS = 30_000;
+
+function newUser() {
   const id = Bun.randomUUIDv7();
   return {
     id,
@@ -18,7 +22,7 @@ export function newUser() {
   };
 }
 
-export function newSession(userId: string) {
+function newSession(userId: string) {
   const id = Bun.randomUUIDv7();
   return {
     id,
@@ -32,11 +36,44 @@ export function newSession(userId: string) {
   };
 }
 
-// The base-model CRUD surface the adapter implements, exercised against a real
-// database so the rendered SQL, type coercions and affected-row counts are
-// checked end to end. `getAdapter` is read lazily so `beforeAll` setup in the
-// caller has run before any test body executes.
-export function registerCrudSuite({
+/**
+ * The adapter is built from the same config `migrate` received, so a run proves
+ * the DDL and the emitted queries agree on `pgSchema`/`tablesPrefix`.
+ */
+export function describeCrudSuite({
+  engines,
+  name,
+  config = (sql) => ({ sql }),
+  migrate,
+}: {
+  engines: Engine[];
+  name: string;
+  config?: (sql: SQL) => BunSqlAdapterConfig;
+  migrate: (context: { sql: SQL; config: BunSqlAdapterConfig }) => Promise<void>;
+}): void {
+  describe.each(engines)('$label', (engine) => {
+    let sql: SQL;
+    let adapter: Adapter;
+
+    beforeAll(async () => {
+      sql = await engine.open();
+      const resolved = config(sql);
+      await migrate({ sql, config: resolved });
+      adapter = makeAdapter({ config: resolved });
+    }, SETUP_TIMEOUT_MS);
+
+    afterAll(async () => {
+      await sql.close();
+      await engine.finish();
+    });
+
+    registerCrudSuite({ name, getAdapter: () => adapter });
+  });
+}
+
+// `getAdapter` is read lazily so the caller's `beforeAll` has run before any
+// test body executes.
+function registerCrudSuite({
   name,
   getAdapter,
 }: {
