@@ -6,7 +6,7 @@
 
 - **Runtime:** Bun (the adapter relies on `bun:sql` and is Bun-only)
 - **Linter/Formatter:** Biome (auto-formats on save)
-- **Tests:** vitest — run with `bun run test` (imports from `vitest`, not `bun:test`). Postgres tests run against real Postgres in Docker (`compose.yaml`), brought up/down once by vitest's `globalSetup` (`tests/support/global-setup.ts`) — **Docker must be running** locally. Every Postgres test runs against all supported majors (16/17/18), one container each, on hardcoded unusual host ports (543 + major, e.g. `54318`) — defined once in `POSTGRES_TARGETS` (`tests/support/postgres.ts`); no `DATABASE_URL` env var. SQLite tests use an in-memory `bun:sql` connection (no Docker). Each Postgres test file gets its own database per target via `createDatabase`/`dropDatabase` so parallel files stay isolated. The conformance suite (`@better-auth/test-utils`) rebuilds the schema between tests and runs twice: `adapter.conformance.test.ts` drives better-auth's own migrator through `pg` + Kysely, which pins it to Postgres but tests the adapter against a schema it did not generate; `adapter.conformance-generated-schema.test.ts` builds the schema from the adapter's `createSchema` under a table prefix, which lifts the Postgres restriction and so covers SQLite too. The adapter under test always uses `bun:sql`.
+- **Tests:** vitest — run with `bun run test` (imports from `vitest`, not `bun:test`). See [Test layout](#test-layout).
 - **Commits:** Conventional Commits (commitlint)
 
 The Bun version is pinned in three places that must be bumped together: `.bun-version` (consumed by CI's `setup-bun` — keep it version-only, no comments), `packageManager` in `package.json`, and `engines.bun`.
@@ -31,6 +31,12 @@ After finishing an implementation, always run:
 4. `bun run build` — verify the build succeeds
 
 Check `package.json` scripts for other available commands.
+
+## Test layout
+
+- A test goes in `tests/postgres/` or `tests/sqlite/` by the engine it covers; what both engines do identically stays at the top level, parameterized over the two dialects.
+- `vitest.config.ts` mirrors each folder as a vitest project of the same name. Only `postgres` starts Docker, so **Docker must be running** for `bun run test` — `--project sqlite` and `--project shared` don't need it.
+- Give each new Postgres test file its own database name: files run in parallel, once per supported major.
 
 ## Test fixtures
 
