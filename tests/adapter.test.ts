@@ -101,6 +101,17 @@ describe('bun sql adapter', () => {
     );
   });
 
+  // The prefix is quoted as part of the table identifier, so a dotted prefix
+  // names a table containing a dot — it is not a way to spell a schema.
+  it('quotes the prefix as part of the table identifier', async () => {
+    const { sql, calls } = fakeSql();
+    const adapter = makeAdapter({ sql, tablesPrefix: 'auth."' });
+
+    await adapter.count({ model: 'user' });
+
+    expect(last(calls).text).toBe('SELECT count(*)::int AS count FROM "auth.""user"');
+  });
+
   it('renders eq/null/AND in findOne and selects requested columns', async () => {
     const { sql, calls } = fakeSql({ rows: [{ id: 'u1' }] });
     const adapter = makeAdapter({ sql });
