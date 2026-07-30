@@ -28,12 +28,15 @@ export const auth = betterAuth({
 
 ### Options
 
-| Option      | Type                      | Default           | Description                                                                                                                                     |
-| ----------- | ------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sql`       | `SQL`                     | -       | **Required.** A `bun:sql` instance connected to a Postgres or SQLite database.                                                                 |
-| `schema`    | `string`                  | -       | Database schema (namespace) the tables live in. When omitted, table names are unqualified and resolved against the connection's `search_path`. SQLite has no schemas, so there it only works against an `ATTACH`ed database of that name. |
-| `usePlural` | `boolean`                 | `false` | Pluralize table names (`user` → `users`).                                                                                                     |
-| `debugLogs` | `DBAdapterDebugLogOption` | `false` | better-auth adapter debug logging.                                                                                                            |
+| Option         | Type                      | Default | Description                                                                                                                                                                                                              |
+| -------------- | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sql`          | `SQL`                     | -       | **Required.** A `bun:sql` instance connected to a Postgres or SQLite database.                                                                                                                                            |
+| `pgSchema`     | `string`                  | -       | **Postgres only.** Schema (namespace) the tables live in. When omitted, table names are unqualified and resolved against the connection's `search_path`. Ignored on SQLite, which has no schemas — use `tablesPrefix` there. |
+| `tablesPrefix` | `string`                  | -       | Prepended to every table name (`user` → `auth_user`), including foreign-key targets and generated index names. Works on both engines.                                                                                     |
+| `usePlural`    | `boolean`                 | `false` | Pluralize table names (`user` → `users`).                                                                                                                                                                                |
+| `debugLogs`    | `DBAdapterDebugLogOption` | `false` | better-auth adapter debug logging.                                                                                                                                                                                       |
+
+better-auth has no table-prefix option of its own — tables can only be renamed one model at a time via `modelName` — so `tablesPrefix` is applied by this adapter when the SQL is rendered, leaving better-auth's own model names untouched.
 
 ## Generating the schema
 

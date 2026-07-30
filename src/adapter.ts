@@ -2,17 +2,37 @@ import { createAdapterFactory, type DBAdapterDebugLogOption } from 'better-auth/
 import type { SQL } from 'bun';
 import { resolveDialect } from './dialect';
 import { buildSchemaDdl, DEFAULT_SCHEMA_FILE } from './schema-builder';
-import { type Param, QueryBuilder, qualified, quoteId, selectColumns } from './sql-builder';
+import {
+  type Param,
+  prefixed,
+  QueryBuilder,
+  qualified,
+  quoteId,
+  selectColumns,
+} from './sql-builder';
 
 export interface BunSqlAdapterConfig {
   /** A `bun:sql` instance connected to a Postgres or SQLite database. */
   sql: SQL;
   /**
-   * Database schema (namespace) the better-auth tables live in. When omitted,
+   * Postgres schema (namespace) the better-auth tables live in. When omitted,
    * table names are emitted unqualified and resolved against the connection's
    * `search_path` — matching better-auth's first-party adapters.
+   *
+   * Schemas are a Postgres feature, so on SQLite this option has no effect. The
+   * same separation from the rest of the database can be had there with
+   * {@link BunSqlAdapterConfig.tablesPrefix}.
    */
-  schema?: string;
+  pgSchema?: string;
+  /**
+   * Prepended to every table name (`user` → `auth_user`), including foreign-key
+   * targets and generated index names. Works on both engines.
+   *
+   * The prefix is applied when the SQL is rendered, so better-auth keeps seeing
+   * its own model names — it has no prefix option of its own, only per-model
+   * `modelName` overrides.
+   */
+  tablesPrefix?: string;
   /** Pluralize table names (`user` → `users`). Defaults to better-auth's `false`. */
   usePlural?: boolean;
   debugLogs?: DBAdapterDebugLogOption;
@@ -24,11 +44,19 @@ export interface BunSqlAdapterConfig {
 type SqlResult<T> = T[] & { count: number };
 
 export function bunSqlAdapter(config: BunSqlAdapterConfig) {
-  const { sql, schema, usePlural = false, debugLogs = false } = config;
+  const { sql, tablesPrefix, usePlural = false, debugLogs = false } = config;
   const quirks = resolveDialect(sql);
+  const pgSchema = quirks.supportsSchemas ? config.pgSchema : undefined;
 
   const run = <T>({ text, params }: { text: string; params: Param[] }): Promise<SqlResult<T>> =>
     sql.unsafe(text, params) as unknown as Promise<SqlResult<T>>;
+
+  // The factory hands every adapter method a `model` already resolved to its
+  // table name (`usePlural`, `modelName`), so prefixing and qualifying it here
+  // is the last step before it reaches the SQL.
+  function tableRef(model: string): string {
+    return qualified({ pgSchema, table: prefixed({ tablesPrefix, table: model }) });
+  }
 
   return createAdapterFactory({
     config: {
@@ -52,7 +80,7 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
           quirks,
           getColumn: (field) => getFieldName({ model, field }),
         });
-        const table = qualified({ schema, model });
+        const table = tableRef(model);
         const placeholders = entries.map(([, value]) => builder.placeholder(value as Param));
         const text =
           entries.length === 0
@@ -65,7 +93,7 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
       findOne: async ({ model, where, select }) => {
         const getColumn = (field: string) => getFieldName({ model, field });
         const builder = new QueryBuilder({ quirks, getColumn });
-        const text = `SELECT ${selectColumns({ select, getColumn })} FROM ${qualified({ schema, model })}${builder.whereClause(where)} LIMIT 1`;
+        const text = `SELECT ${selectColumns({ select, getColumn })} FROM ${tableRef(model)}${builder.whereClause(where)} LIMIT 1`;
         const [row] = await run<Record<string, unknown>>({ text, params: builder.values() });
         return (row ?? null) as never;
       },
@@ -73,7 +101,7 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
       findMany: async ({ model, where, limit, sortBy, offset, select }) => {
         const getColumn = (field: string) => getFieldName({ model, field });
         const builder = new QueryBuilder({ quirks, getColumn });
-        let text = `SELECT ${selectColumns({ select, getColumn })} FROM ${qualified({ schema, model })}${builder.whereClause(where)}`;
+        let text = `SELECT ${selectColumns({ select, getColumn })} FROM ${tableRef(model)}${builder.whereClause(where)}`;
         if (sortBy) {
           text += ` ORDER BY ${quoteId(getColumn(sortBy.field))} ${sortBy.direction === 'desc' ? 'DESC' : 'ASC'}`;
         }
@@ -91,7 +119,7 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
           quirks,
           getColumn: (field) => getFieldName({ model, field }),
         });
-        const text = `SELECT ${quirks.countExpression} AS count FROM ${qualified({ schema, model })}${builder.whereClause(where)}`;
+        const text = `SELECT ${quirks.countExpression} AS count FROM ${tableRef(model)}${builder.whereClause(where)}`;
         const [row] = await run<{ count: number }>({ text, params: builder.values() });
         return row?.count ?? 0;
       },
@@ -105,7 +133,7 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
         if (set.length === 0) {
           return null as never;
         }
-        const text = `UPDATE ${qualified({ schema, model })} SET ${set.join(', ')}${builder.whereClause(where)} RETURNING *`;
+        const text = `UPDATE ${tableRef(model)} SET ${set.join(', ')}${builder.whereClause(where)} RETURNING *`;
         const [row] = await run<Record<string, unknown>>({ text, params: builder.values() });
         return (row ?? null) as never;
       },
@@ -119,7 +147,7 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
         if (set.length === 0) {
           return 0;
         }
-        const text = `UPDATE ${qualified({ schema, model })} SET ${set.join(', ')}${builder.whereClause(where)}`;
+        const text = `UPDATE ${tableRef(model)} SET ${set.join(', ')}${builder.whereClause(where)}`;
         const result = await run<unknown>({ text, params: builder.values() });
         return result.count;
       },
@@ -130,7 +158,7 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
           getColumn: (field) => getFieldName({ model, field }),
         });
         await run({
-          text: `DELETE FROM ${qualified({ schema, model })}${builder.whereClause(where)}`,
+          text: `DELETE FROM ${tableRef(model)}${builder.whereClause(where)}`,
           params: builder.values(),
         });
       },
@@ -141,7 +169,7 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
           getColumn: (field) => getFieldName({ model, field }),
         });
         const result = await run<unknown>({
-          text: `DELETE FROM ${qualified({ schema, model })}${builder.whereClause(where)}`,
+          text: `DELETE FROM ${tableRef(model)}${builder.whereClause(where)}`,
           params: builder.values(),
         });
         return result.count;
@@ -155,7 +183,8 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
         Promise.resolve({
           code: buildSchemaDdl({
             tables,
-            schema,
+            pgSchema,
+            tablesPrefix,
             quirks,
             idStrategy: options.advanced?.database?.generateId === 'serial' ? 'serial' : 'text',
             getTable: getModelName,

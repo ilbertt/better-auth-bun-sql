@@ -6,7 +6,7 @@
 
 - **Runtime:** Bun (the adapter relies on `bun:sql` and is Bun-only)
 - **Linter/Formatter:** Biome (auto-formats on save)
-- **Tests:** vitest — run with `bun run test` (imports from `vitest`, not `bun:test`). Postgres tests run against real Postgres in Docker (`compose.yaml`), brought up/down once by vitest's `globalSetup` (`tests/support/global-setup.ts`) — **Docker must be running** locally. Every Postgres test runs against all supported majors (16/17/18), one container each, on hardcoded unusual host ports (543 + major, e.g. `54318`) — defined once in `POSTGRES_TARGETS` (`tests/support/postgres.ts`); no `DATABASE_URL` env var. SQLite tests use an in-memory `bun:sql` connection (no Docker). Each Postgres test file gets its own database per target via `createDatabase`/`dropDatabase` so parallel files stay isolated. The conformance suite (`@better-auth/test-utils`) rebuilds the schema between tests and drives the migrator through `pg` + Kysely; the adapter under test always uses `bun:sql`.
+- **Tests:** vitest — run with `bun run test` (imports from `vitest`, not `bun:test`). Postgres tests run against real Postgres in Docker (`compose.yaml`), brought up/down once by vitest's `globalSetup` (`tests/support/global-setup.ts`) — **Docker must be running** locally. Every Postgres test runs against all supported majors (16/17/18), one container each, on hardcoded unusual host ports (543 + major, e.g. `54318`) — defined once in `POSTGRES_TARGETS` (`tests/support/postgres.ts`); no `DATABASE_URL` env var. SQLite tests use an in-memory `bun:sql` connection (no Docker). Each Postgres test file gets its own database per target via `createDatabase`/`dropDatabase` so parallel files stay isolated. The conformance suite (`@better-auth/test-utils`) rebuilds the schema between tests and runs twice: `adapter.conformance.test.ts` drives better-auth's own migrator through `pg` + Kysely, which pins it to Postgres but tests the adapter against a schema it did not generate; `adapter.conformance-generated-schema.test.ts` builds the schema from the adapter's `createSchema` under a table prefix, which lifts the Postgres restriction and so covers SQLite too. The adapter under test always uses `bun:sql`.
 - **Commits:** Conventional Commits (commitlint)
 
 The Bun version is pinned in three places that must be bumped together: `.bun-version` (consumed by CI's `setup-bun` — keep it version-only, no comments), `packageManager` in `package.json`, and `engines.bun`.
@@ -16,6 +16,8 @@ The Bun version is pinned in three places that must be bumped together: `.bun-ve
 - No comments that restate what types and naming already say — only comment the non-obvious
 - Imports use `#*` subpath mapping (e.g. `import { foo } from '#services/foo'` → `src/services/foo`)
 - Single source of truth — never duplicate keys, enum values, or type info that belongs to a class/module; derive from the source instead
+- Declare functions with `function foo() {}`, not `const foo = () => {}`, wherever a declaration is possible
+- Parameterize tests with `describe.each`/`it.each` rather than looping over cases — a `describe` callback may be `async`, which is enough for setup that has to happen during collection
 - Biome enforces `useMaxParams: 1` — wrap multiple params in an object
 - Only re-export from index files — Biome enforces that (`noBarrelFile`)
 
