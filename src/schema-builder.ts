@@ -132,17 +132,15 @@ function idColumnDefinition(context: DdlContext): string {
 function createIndexStatement({
   table,
   column,
-  unique,
   context,
 }: {
   table: string;
   column: string;
-  unique: boolean;
   context: DdlContext;
 }): string {
-  const name = quoteId(`${table}_${column}_${unique ? 'uidx' : 'idx'}`);
+  const name = quoteId(`${table}_${column}_idx`);
   const on = qualified({ pgSchema: context.pgSchema, table });
-  return `create ${unique ? 'unique ' : ''}index ${name} on ${on} (${quoteId(column)})`;
+  return `create index ${name} on ${on} (${quoteId(column)})`;
 }
 
 /**
@@ -204,15 +202,10 @@ export function buildSchemaDdl({
     for (const [field, attributes] of Object.entries(fields)) {
       const column = getColumn({ model, field });
       definition.columns.push(columnDefinition({ column, field: attributes, context }));
-      if (attributes.index) {
-        definition.indexes.push(
-          createIndexStatement({
-            table,
-            column,
-            unique: attributes.unique === true,
-            context,
-          }),
-        );
+      // A `unique` column constraint already carries an index, so better-auth
+      // emits a separate one only for indexed fields that are not unique.
+      if (attributes.index && attributes.unique !== true) {
+        definition.indexes.push(createIndexStatement({ table, column, context }));
       }
     }
   }

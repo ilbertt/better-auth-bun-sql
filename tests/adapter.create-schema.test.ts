@@ -108,15 +108,15 @@ describe('createSchema', () => {
     expect(code.trim()).toBe(await canonicalSqliteDdl(options));
   });
 
-  it.each([
-    'postgres',
-    'sqlite',
-  ] as const)('reproduces the committed %s fixture for the core models', async (engine) => {
-    const { code } = await generateSchema({
-      config: { sql: engine === 'postgres' ? postgres : sqlite },
-    });
-    expect(code.trim()).toBe(await fixture(engine));
-  });
+  it.each(['postgres', 'sqlite'] as const)(
+    'reproduces the committed %s fixture for the core models',
+    async (engine) => {
+      const { code } = await generateSchema({
+        config: { sql: engine === 'postgres' ? postgres : sqlite },
+      });
+      expect(code.trim()).toBe(await fixture(engine));
+    },
+  );
 
   it('defaults to ./auth-schema.sql and honours an explicit output file', async () => {
     const { path } = await generateSchema({ config: { sql: postgres } });
@@ -164,7 +164,7 @@ describe('createSchema', () => {
     expect(code).toContain('create index "sessions_userId_idx" on "sessions" ("userId")');
   });
 
-  it('names a unique index with the uidx suffix', async () => {
+  it('covers a unique indexed field with the column constraint alone', async () => {
     const { code } = await generateSchema({
       config: { sql: postgres },
       options: {
@@ -172,7 +172,9 @@ describe('createSchema', () => {
       },
     });
 
-    expect(code).toContain('create unique index "user_slug_uidx" on "user" ("slug")');
+    expect(code).toContain('"slug" text not null unique');
+    expect(code).not.toContain('create index "user_slug_idx"');
+    expect(code).not.toContain('create unique index "user_slug_uidx"');
   });
 
   // The two places the generated DDL deliberately parts ways with better-auth's
