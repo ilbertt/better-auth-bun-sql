@@ -4,12 +4,12 @@ export type PostgresTarget = { version: number; port: number };
 
 // The Postgres versions the suite runs against, one container each (see
 // compose.yaml). Ports are hardcoded — we own the containers, so there's no
-// need for a DATABASE_URL env var — and deliberately unusual (543 + version) to
-// avoid clashing with anything a developer already runs locally.
+// need for a DATABASE_URL env var — and deliberately unusual (154 + version) to
+// stay below Linux's ephemeral port range while avoiding the Postgres default.
 export const POSTGRES_TARGETS: PostgresTarget[] = [
-  { version: 16, port: 54316 },
-  { version: 17, port: 54317 },
-  { version: 18, port: 54318 },
+  { version: 16, port: 15416 },
+  { version: 17, port: 15417 },
+  { version: 18, port: 15418 },
 ];
 
 export function databaseUrl({ port, name }: { port: number; name: string }): string {

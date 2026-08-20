@@ -1,8 +1,9 @@
 # Postgres servers used by the test suite — one per supported major version, so
 # every `bun test` proves the adapter across all of them. Brought up/down
 # automatically by vitest's globalSetup (tests/support/global-setup.ts), so local
-# and CI share one env. Host ports mirror tests/support/postgres.ts (543 + major
-# version) and are deliberately unusual to avoid clashing with a local Postgres.
+# and CI share one env. Host ports mirror tests/support/postgres.ts (154 + major
+# version), staying below Linux's ephemeral port range while avoiding the default
+# Postgres port.
 x-postgres: &postgres
   environment:
     POSTGRES_USER: postgres
@@ -19,14 +20,14 @@ services:
     <<: *postgres
     image: postgres:16-alpine
     ports:
-      - '54316:5432'
+      - '15416:5432'
   postgres-17:
     <<: *postgres
     image: postgres:17-alpine
     ports:
-      - '54317:5432'
+      - '15417:5432'
   postgres-18:
     <<: *postgres
     image: postgres:18-alpine
     ports:
-      - '54318:5432'
+      - '15418:5432'
