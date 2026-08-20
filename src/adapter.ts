@@ -1,4 +1,5 @@
 import { createAdapterFactory, type DBAdapterDebugLogOption } from 'better-auth/adapters';
+import { getSchema } from 'better-auth/db';
 import type { SQL } from 'bun';
 import { resolveDialect } from './dialect';
 import { buildSchemaDdl, DEFAULT_SCHEMA_FILE } from './schema-builder';
@@ -42,6 +43,18 @@ export interface BunSqlAdapterConfig {
 // number of rows the statement affected) — the source of truth for the
 // affected-row totals `updateMany`/`deleteMany` must return.
 type SqlResult<T> = T[] & { count: number };
+
+function oneRowSubquery({
+  table,
+  idColumn,
+  where,
+}: {
+  table: string;
+  idColumn: string;
+  where: string;
+}): string {
+  return `SELECT ${idColumn} FROM ${table}${where} LIMIT 1`;
+}
 
 export function bunSqlAdapter(config: BunSqlAdapterConfig) {
   const { sql, tablesPrefix, usePlural = false, debugLogs = false } = config;
@@ -175,14 +188,54 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
         return result.count;
       },
 
+      consumeOne: async ({ model, where }) => {
+        const getColumn = (field: string) => getFieldName({ model, field });
+        const builder = new QueryBuilder({ quirks, getColumn });
+        const table = tableRef(model);
+        const idColumn = quoteId(getColumn('id'));
+        const target = oneRowSubquery({
+          table,
+          idColumn,
+          where: builder.whereClause(where),
+        });
+        const [row] = await run<Record<string, unknown>>({
+          text: `DELETE FROM ${table} WHERE ${idColumn} IN (${target}) RETURNING *`,
+          params: builder.values(),
+        });
+        return (row ?? null) as never;
+      },
+
+      incrementOne: async ({ model, where, increment, set }) => {
+        const getColumn = (field: string) => getFieldName({ model, field });
+        const builder = new QueryBuilder({ quirks, getColumn });
+        const table = tableRef(model);
+        const idColumn = quoteId(getColumn('id'));
+        const absolute = Object.fromEntries(
+          Object.entries(set ?? {}).filter(([column]) => !Object.hasOwn(increment, column)),
+        );
+        const assignments = [...builder.assignments(absolute), ...builder.increments(increment)];
+        const rowGuard = builder.whereClause(where);
+        const target = oneRowSubquery({
+          table,
+          idColumn,
+          where: builder.whereClause(where),
+        });
+        const targetGuard = `${rowGuard}${rowGuard ? ' AND' : ' WHERE'} ${idColumn} IN (${target})`;
+        const [row] = await run<Record<string, unknown>>({
+          text: `UPDATE ${table} SET ${assignments.join(', ')}${targetGuard} RETURNING *`,
+          params: builder.values(),
+        });
+        return (row ?? null) as never;
+      },
+
       // Backs `@better-auth/cli generate`, which has built-in generators only for
       // Prisma/Drizzle/Kysely and asks every other adapter for its own schema.
       // `overwrite` is left unset so the CLI asks whether to write the file
       // instead of claiming it already exists.
-      createSchema: ({ file, tables }) =>
+      createSchema: ({ file }) =>
         Promise.resolve({
           code: buildSchemaDdl({
-            tables,
+            tables: getSchema(options),
             pgSchema,
             tablesPrefix,
             quirks,

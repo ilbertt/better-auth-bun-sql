@@ -27,6 +27,9 @@ describe.each(DIALECTS)('createSchema on %s', (dialect) => {
     expect(code).toContain('create table "users" (');
     expect(code).toContain('references "users" ("id") on delete cascade');
     expect(code).toContain('create index "sessions_userId_idx" on "sessions" ("userId")');
+    expect(code).toContain(
+      'create unique index "accounts_issuer_accountId_uidx" on "accounts" ("issuer", "accountId")',
+    );
   });
 
   it('covers a unique indexed field with the column constraint alone', async () => {
