@@ -8,8 +8,8 @@ export type Call = { text: string; params: unknown[] };
  * `count` stands in for the affected-row total bun:sql exposes on a result.
  *
  * `dialect` is reported through `options.adapter`, the way a real bun:sql
- * instance reports its engine; leaving it out drops `options` entirely — the
- * shape a default Postgres connection has.
+ * instance reports its engine; leaving it out drops `options` entirely, which
+ * the adapter falls back to treating as Postgres.
  */
 export function fakeSql({
   rows = [],

@@ -8,7 +8,9 @@ A [better-auth](https://better-auth.com) database adapter for Bun's built-in SQL
 bun add @ilbertt/better-auth-bun-sql
 ```
 
-> Requires [Bun](https://bun.com) — this adapter relies on the `bun:sql` runtime module and does not work on Node.js.
+> Requires [Bun](https://bun.com) 1.4 or later — this adapter relies on the `bun:sql` runtime module and does not work on Node.js.
+>
+> 1.4 is the floor because earlier `bun:sql` versions could hand one Postgres query's rows to another when a parameter-less query and a parameterized one shared a connection ([oven-sh/bun#32772](https://github.com/oven-sh/bun/issues/32772)) — a mix this adapter emits routinely.
 
 ## Usage
 

@@ -26,7 +26,7 @@ The Bun version is pinned in three places that must be bumped together: `.bun-ve
 After finishing an implementation, always run:
 
 1. `bun fix:codestyle` — auto-fix formatting/lint issues
-2. `bun check:all` — verify types and codestyle pass
+2. `bun check:all` — verify types and codestyle pass (`bun run --parallel`, so both report even when one fails)
 3. `bun run test` — run the test suite (vitest, via `bun --bun vitest run`)
 4. `bun run build` — verify the build succeeds
 

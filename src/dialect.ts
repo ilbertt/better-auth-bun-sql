@@ -82,9 +82,9 @@ const QUIRKS: Record<BunSqlDialect, DialectQuirks> = {
   },
 };
 
-// `bun:sql` records the engine on the instance as `options.adapter`. It is
-// absent on a default Postgres connection and on hand-rolled `SQL`-shaped test
-// doubles, both of which we treat as Postgres.
+// `bun:sql` records the engine on the instance as `options.adapter`, and fills
+// it in on every real connection. Only hand-rolled `SQL`-shaped test doubles
+// leave it out, and those stand in for Postgres.
 function detectDialect(sql: SQL): BunSqlDialect {
   const adapter = (sql.options as { adapter?: string } | undefined)?.adapter;
   if (adapter === 'sqlite') {
