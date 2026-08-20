@@ -9,7 +9,7 @@
 - **Tests:** vitest — run with `bun run test` (imports from `vitest`, not `bun:test`). See [Test layout](#test-layout).
 - **Commits:** Conventional Commits (commitlint)
 
-The Bun version is pinned in three places that must be bumped together: `.bun-version` (consumed by CI's `setup-bun` — keep it version-only, no comments), `packageManager` in `package.json`, and `engines.bun`.
+The Bun version appears in three places, but they are not one knob. `.bun-version` (consumed by CI's `setup-bun` — keep it version-only, no comments) and `packageManager` in `package.json` pin the development toolchain and are bumped together. `engines.bun` is the *consumer* floor: raise it only when the published code genuinely needs the newer Bun, since it's a breaking change and Bun doesn't enforce it anyway (an install under an older Bun succeeds silently). A `bun:sql` bug fixed upstream is a README recommendation, not a floor.
 
 ## Code style
 
@@ -26,7 +26,7 @@ The Bun version is pinned in three places that must be bumped together: `.bun-ve
 After finishing an implementation, always run:
 
 1. `bun fix:codestyle` — auto-fix formatting/lint issues
-2. `bun check:all` — verify types and codestyle pass
+2. `bun check:all` — verify types and codestyle pass (`bun run --parallel`, so both report even when one fails)
 3. `bun run test` — run the test suite (vitest, via `bun --bun vitest run`)
 4. `bun run build` — verify the build succeeds
 
