@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-08-20
+
+### 🚀 Features
+
+- Support better-auth 1.7 atomic operations (#15)
+
+### 📦 Build & Dependencies
+
+- *(deps)* Update dependencies (#16)
+- Upgrade the toolchain to bun 1.4 (#14)
+
 ## [0.2.0] - 2026-07-30
 
 ### 🚀 Features
