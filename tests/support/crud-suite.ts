@@ -3,38 +3,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { BunSqlAdapterConfig } from '#index.ts';
 import { type Adapter, makeAdapter } from './adapter.ts';
 import type { Engine } from './engines.ts';
-
-const ONE_HOUR_MS = 3_600_000;
+import { newSession, newUser } from './records.ts';
 
 // Creating a database and running the DDL goes over the network to a container.
 const SETUP_TIMEOUT_MS = 30_000;
-
-function newUser() {
-  const id = Bun.randomUUIDv7();
-  return {
-    id,
-    name: `user-${id}`,
-    email: `user-${id}@email.com`,
-    emailVerified: true,
-    image: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-}
-
-function newSession(userId: string) {
-  const id = Bun.randomUUIDv7();
-  return {
-    id,
-    expiresAt: new Date(Date.now() + ONE_HOUR_MS),
-    token: Bun.randomUUIDv7(),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    ipAddress: '127.0.0.1',
-    userAgent: 'Some User Agent',
-    userId,
-  };
-}
 
 /**
  * The adapter is built from the same config `migrate` received, so a run proves

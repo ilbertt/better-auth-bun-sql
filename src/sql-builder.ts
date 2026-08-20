@@ -75,6 +75,12 @@ export class QueryBuilder {
     );
   }
 
+  increments(increment: Record<string, number>): string[] {
+    return Object.entries(increment).map(
+      ([column, delta]) => `${quoteId(column)} = ${quoteId(column)} + ${this.placeholder(delta)}`,
+    );
+  }
+
   whereClause(where: CleanedWhere[] | undefined): string {
     if (!where || where.length === 0) {
       return '';

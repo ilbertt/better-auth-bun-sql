@@ -144,4 +144,46 @@ describe.each(DIALECTS)('query shapes on %s', (dialect) => {
     expect(deleted.calls[0]?.text).toBe('DELETE FROM "session" WHERE "userId" = $1');
     expect(removed).toBe(deletedRows);
   });
+
+  it('atomically deletes and returns at most one matching row', async () => {
+    const consumed = { id: 'verification-1', identifier: 'owner-setup' };
+    const { sql, calls } = fakeSql({ dialect, rows: [consumed] });
+    const adapter = makeAdapter({ config: { sql } });
+
+    const row = await adapter.consumeOne<typeof consumed>({
+      model: 'verification',
+      where: [{ field: 'identifier', value: consumed.identifier }],
+    });
+
+    expect(lastCall(calls)).toEqual({
+      text: 'DELETE FROM "verification" WHERE "id" IN (SELECT "id" FROM "verification" WHERE "identifier" = $1 LIMIT 1) RETURNING *',
+      params: [consumed.identifier],
+    });
+    expect(row).toEqual(consumed);
+  });
+
+  it('atomically updates one guarded counter and returns the row', async () => {
+    const updated = { id: 'user-1', age: 1, name: 'Retried' };
+    const { sql, calls } = fakeSql({ dialect, rows: [updated] });
+    const adapter = makeAdapter({
+      config: { sql },
+      options: { user: { additionalFields: { age: { type: 'number' } } } },
+    });
+
+    const row = await adapter.incrementOne<typeof updated>({
+      model: 'user',
+      where: [
+        { field: 'id', value: updated.id },
+        { field: 'age', value: 0, operator: 'gt' },
+      ],
+      increment: { age: -1 },
+      set: { name: updated.name },
+    });
+
+    expect(lastCall(calls)).toEqual({
+      text: 'UPDATE "user" SET "name" = $1, "updatedAt" = $2, "age" = "age" + $3 WHERE "id" = $4 AND "age" > $5 AND "id" IN (SELECT "id" FROM "user" WHERE "id" = $6 AND "age" > $7 LIMIT 1) RETURNING *',
+      params: [updated.name, expect.anything(), -1, updated.id, 0, updated.id, 0],
+    });
+    expect(row).toEqual(updated);
+  });
 });

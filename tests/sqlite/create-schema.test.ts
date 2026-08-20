@@ -51,6 +51,10 @@ const OPTION_SETS: { name: string; options: BetterAuthOptions }[] = [
     options: {
       user: { modelName: 'app_user', fields: { email: 'email_address' } },
       session: { modelName: 'app_session', fields: { userId: 'user_ref' } },
+      account: {
+        modelName: 'app_account',
+        fields: { issuer: 'issuer_name', accountId: 'external_account_id' },
+      },
     },
   },
   {

@@ -33,6 +33,9 @@ describe('createSchema on postgres', () => {
     expect(code).toContain(
       'create index "auth_session_userId_idx" on "app_auth"."auth_session" ("userId")',
     );
+    expect(code).toContain(
+      'create unique index "auth_account_issuer_accountId_uidx" on "app_auth"."auth_account" ("issuer", "accountId")',
+    );
   });
 
   // Where the generated DDL deliberately parts ways with better-auth's Kysely

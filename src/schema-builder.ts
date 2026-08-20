@@ -1,4 +1,4 @@
-import type { BetterAuthDBSchema, DBFieldAttribute } from 'better-auth/db';
+import type { DBFieldAttribute } from 'better-auth/db';
 import type { DialectQuirks } from './dialect';
 import { prefixed, qualified, quoteId } from './sql-builder';
 
@@ -19,27 +19,38 @@ export const DEFAULT_SCHEMA_FILE = './auth-schema.sql';
  */
 export type IdStrategy = 'text' | 'serial';
 
-/** Maps a better-auth model name to its table name (`usePlural`, `modelName`). */
-type GetTable = (model: string) => string;
-
-/** Maps a model field name to its column name. */
-type GetColumn = (props: { model: string; field: string }) => string;
-
 type DdlContext = {
   quirks: DialectQuirks;
   idStrategy: IdStrategy;
   pgSchema: string | undefined;
   /** Resolves a model to its final, already-prefixed table name. */
-  getTable: GetTable;
-  getColumn: GetColumn;
+  getTable: (model: string) => string;
+  getColumn: (props: { model: string; field: string }) => string;
 };
 
 type TableDefinition = {
   table: string;
   order: number;
   columns: string[];
-  indexes: string[];
+  fieldIndexes: string[];
+  tableIndexes: string[];
 };
+
+type ResolvedTableIndex = {
+  columns: readonly [string, ...string[]];
+  name: string;
+  unique?: boolean;
+};
+
+export type ResolvedSchema = Record<
+  string,
+  {
+    fields: Record<string, DBFieldAttribute>;
+    indexes?: readonly ResolvedTableIndex[];
+    order: number;
+    disableMigrations?: boolean;
+  }
+>;
 
 function columnType({
   column,
@@ -143,6 +154,29 @@ function createIndexStatement({
   return `create index ${name} on ${on} (${quoteId(column)})`;
 }
 
+function createTableIndexStatement({
+  table,
+  model,
+  index,
+  context,
+}: {
+  table: string;
+  model: string;
+  index: ResolvedTableIndex;
+  context: DdlContext;
+}): string {
+  const unique = index.unique ? ' unique' : '';
+  const mappedName = index.name.startsWith(`${model}_`)
+    ? `${table}${index.name.slice(model.length)}`
+    : index.name;
+  const name = quoteId(mappedName);
+  const on = qualified({ pgSchema: context.pgSchema, table });
+  const columns = index.columns
+    .map((field) => quoteId(context.getColumn({ model, field })))
+    .join(', ');
+  return `create${unique} index ${name} on ${on} (${columns})`;
+}
+
 /**
  * Renders the full `CREATE TABLE`/`CREATE INDEX` DDL for a better-auth schema.
  *
@@ -159,18 +193,18 @@ export function buildSchemaDdl({
   getTable,
   getColumn,
 }: {
-  tables: BetterAuthDBSchema;
+  tables: ResolvedSchema;
   pgSchema: string | undefined;
   tablesPrefix: string | undefined;
   quirks: DialectQuirks;
   idStrategy: IdStrategy;
-  getTable: GetTable;
-  getColumn: GetColumn;
+  getTable: (model: string) => string;
+  getColumn: (props: { model: string; field: string }) => string;
 }): string {
   // Applied once here rather than at every reference so index names carry the
   // prefix too — on SQLite they share one namespace with every other table.
-  function prefixedTable(model: string): string {
-    return prefixed({ tablesPrefix, table: getTable(model) });
+  function prefixedTable(table: string): string {
+    return prefixed({ tablesPrefix, table: getTable(table) });
   }
 
   const context: DdlContext = {
@@ -187,7 +221,7 @@ export function buildSchemaDdl({
   // `disableMigrations` is deliberately not honoured: better-auth declares the
   // flag but reads it nowhere, so skipping those tables would omit tables its own
   // generator emits — a user who owns a table can drop the statement instead.
-  for (const [model, { fields, order }] of Object.entries(tables)) {
+  for (const [model, { fields, indexes, order }] of Object.entries(tables)) {
     const table = context.getTable(model);
     let definition = definitions.get(table);
     if (!definition) {
@@ -195,7 +229,8 @@ export function buildSchemaDdl({
         table,
         order: order ?? Number.POSITIVE_INFINITY,
         columns: [idColumnDefinition(context)],
-        indexes: [],
+        fieldIndexes: [],
+        tableIndexes: [],
       };
       definitions.set(table, definition);
     }
@@ -205,8 +240,11 @@ export function buildSchemaDdl({
       // A `unique` column constraint already carries an index, so better-auth
       // emits a separate one only for indexed fields that are not unique.
       if (attributes.index && attributes.unique !== true) {
-        definition.indexes.push(createIndexStatement({ table, column, context }));
+        definition.fieldIndexes.push(createIndexStatement({ table, column, context }));
       }
+    }
+    for (const index of indexes ?? []) {
+      definition.tableIndexes.push(createTableIndexStatement({ table, model, index, context }));
     }
   }
 
@@ -226,7 +264,8 @@ export function buildSchemaDdl({
       ({ table, columns }) =>
         `create table ${qualified({ pgSchema, table })} (${columns.join(', ')})`,
     ),
-    ...ordered.flatMap(({ indexes }) => indexes),
+    ...ordered.flatMap(({ fieldIndexes }) => fieldIndexes),
+    ...ordered.flatMap(({ tableIndexes }) => tableIndexes),
   ];
   return `${statements.join(';\n\n')};`;
 }
