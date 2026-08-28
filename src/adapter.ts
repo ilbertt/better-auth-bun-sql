@@ -1,4 +1,3 @@
-import type { BetterAuthOptions } from 'better-auth';
 import {
   createAdapterFactory,
   type DBAdapterDebugLogOption,
@@ -49,6 +48,12 @@ export interface BunSqlAdapterConfig {
 // affected-row totals `updateMany`/`deleteMany` must return.
 type SqlResult<T> = T[] & { count: number };
 
+/**
+ * Opens the transaction this adapter's queries run in, or `false` for the
+ * adapter handed to a transaction callback: it is already inside one.
+ */
+type OpenTransaction = (<T>(work: (scoped: SQL) => Promise<T>) => Promise<T>) | false;
+
 function oneRowSubquery({
   table,
   idColumn,
@@ -61,19 +66,27 @@ function oneRowSubquery({
   return `SELECT ${idColumn} FROM ${table}${where} LIMIT 1`;
 }
 
-function createBunSqlAdapter({
-  config,
-  supportsTransactions,
-}: {
-  config: BunSqlAdapterConfig;
-  supportsTransactions: boolean;
-}): DBAdapterInstance {
+function runNow<T>(work: () => Promise<T>): Promise<T> {
+  return work();
+}
+
+/**
+ * Runs one `work` at a time, in call order. A rejected predecessor still
+ * releases the queue — the caller of *that* call gets the rejection.
+ */
+function serially(): <T>(work: () => Promise<T>) => Promise<T> {
+  let tail: Promise<unknown> = Promise.resolve();
+  return <T>(work: () => Promise<T>) => {
+    const result = tail.then(work, work);
+    tail = result.catch(() => undefined);
+    return result;
+  };
+}
+
+export function bunSqlAdapter(config: BunSqlAdapterConfig): DBAdapterInstance {
   const { sql, tablesPrefix, usePlural = false, debugLogs = false } = config;
   const quirks = resolveDialect(sql);
   const pgSchema = quirks.supportsSchemas ? config.pgSchema : undefined;
-
-  const run = <T>({ text, params }: { text: string; params: Param[] }): Promise<SqlResult<T>> =>
-    sql.unsafe(text, params) as unknown as Promise<SqlResult<T>>;
 
   // The factory hands every adapter method a `model` already resolved to its
   // table name (`usePlural`, `modelName`), so prefixing and qualifying it here
@@ -82,201 +95,216 @@ function createBunSqlAdapter({
     return qualified({ pgSchema, table: prefixed({ tablesPrefix, table: model }) });
   }
 
-  let options: BetterAuthOptions | null = null;
-  const adapter = createAdapterFactory({
-    config: {
-      adapterId: 'bun-sql',
-      adapterName: 'Bun SQL Adapter',
-      supportsJSON: false,
-      supportsArrays: false,
-      supportsNumericIds: true,
-      supportsDates: quirks.supportsDates,
-      supportsBooleans: quirks.supportsBooleans,
-      usePlural,
-      debugLogs,
-      transaction: supportsTransactions
-        ? (callback) =>
-            sql.begin((transactionSql) =>
-              callback(
-                createBunSqlAdapter({
-                  config: { ...config, sql: transactionSql },
-                  supportsTransactions: false,
-                })(options!),
-              ),
-            )
-        : false,
-    },
-    // `data`/`update` keys arrive already mapped to column names by the factory,
-    // but `where`/`select`/`sortBy` carry model field names — so those are mapped
-    // to columns here via `getFieldName`.
-    adapter: ({ options, getModelName, getFieldName }) => ({
-      create: async ({ model, data }) => {
-        const entries = Object.entries(data);
-        const builder = new QueryBuilder({
-          quirks,
-          getColumn: (field) => getFieldName({ model, field }),
-        });
-        const table = tableRef(model);
-        const placeholders = entries.map(([, value]) => builder.placeholder(value as Param));
-        const text =
-          entries.length === 0
-            ? `INSERT INTO ${table} DEFAULT VALUES RETURNING *`
-            : `INSERT INTO ${table} (${entries.map(([column]) => quoteId(column)).join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`;
-        const [row] = await run<Record<string, unknown>>({ text, params: builder.values() });
-        return row as never;
-      },
+  const queued = quirks.serializeTransactions ? serially() : runNow;
 
-      findOne: async ({ model, where, select }) => {
-        const getColumn = (field: string) => getFieldName({ model, field });
-        const builder = new QueryBuilder({ quirks, getColumn });
-        const text = `SELECT ${selectColumns({ select, getColumn })} FROM ${tableRef(model)}${builder.whereClause(where)} LIMIT 1`;
-        const [row] = await run<Record<string, unknown>>({ text, params: builder.values() });
-        return (row ?? null) as never;
-      },
+  /**
+   * The adapter better-auth holds and the one its `transaction` callback
+   * receives differ only in the handle their queries run on, so everything
+   * resolved above is shared and only `run` is rebound here.
+   *
+   * An adapter already inside a transaction opens none of its own, so a nested
+   * `transaction()` runs as-is against the same handle — the way better-auth's
+   * own kysely, drizzle and prisma adapters nest.
+   */
+  function adapterOn({ handle, open }: { handle: SQL; open: OpenTransaction }): DBAdapterInstance {
+    const run = <T>({ text, params }: { text: string; params: Param[] }): Promise<SqlResult<T>> =>
+      handle.unsafe(text, params) as unknown as Promise<SqlResult<T>>;
 
-      findMany: async ({ model, where, limit, sortBy, offset, select }) => {
-        const getColumn = (field: string) => getFieldName({ model, field });
-        const builder = new QueryBuilder({ quirks, getColumn });
-        let text = `SELECT ${selectColumns({ select, getColumn })} FROM ${tableRef(model)}${builder.whereClause(where)}`;
-        if (sortBy) {
-          text += ` ORDER BY ${quoteId(getColumn(sortBy.field))} ${sortBy.direction === 'desc' ? 'DESC' : 'ASC'}`;
-        }
-        if (typeof limit === 'number') {
-          text += ` LIMIT ${builder.placeholder(limit)}`;
-        }
-        if (typeof offset === 'number') {
-          text += ` OFFSET ${builder.placeholder(offset)}`;
-        }
-        return (await run<Record<string, unknown>>({ text, params: builder.values() })) as never;
-      },
+    // `authOptions` is what the transaction-scoped adapter has to be built
+    // with, so the factory is assembled per instance rather than once per
+    // config — two better-auth instances sharing one `bunSqlAdapter` value must
+    // not end up sharing a schema.
+    return (authOptions) =>
+      createAdapterFactory({
+        config: {
+          adapterId: 'bun-sql',
+          adapterName: 'Bun SQL Adapter',
+          supportsJSON: false,
+          supportsArrays: false,
+          supportsNumericIds: true,
+          supportsDates: quirks.supportsDates,
+          supportsBooleans: quirks.supportsBooleans,
+          usePlural,
+          debugLogs,
+          transaction:
+            open === false
+              ? false
+              : (callback) =>
+                  open((scoped) =>
+                    callback(adapterOn({ handle: scoped, open: false })(authOptions)),
+                  ),
+        },
+        // `data`/`update` keys arrive already mapped to column names by the factory,
+        // but `where`/`select`/`sortBy` carry model field names — so those are mapped
+        // to columns here via `getFieldName`.
+        adapter: ({ options, getModelName, getFieldName }) => ({
+          create: async ({ model, data }) => {
+            const entries = Object.entries(data);
+            const builder = new QueryBuilder({
+              quirks,
+              getColumn: (field) => getFieldName({ model, field }),
+            });
+            const table = tableRef(model);
+            const placeholders = entries.map(([, value]) => builder.placeholder(value as Param));
+            const text =
+              entries.length === 0
+                ? `INSERT INTO ${table} DEFAULT VALUES RETURNING *`
+                : `INSERT INTO ${table} (${entries.map(([column]) => quoteId(column)).join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`;
+            const [row] = await run<Record<string, unknown>>({ text, params: builder.values() });
+            return row as never;
+          },
 
-      count: async ({ model, where }) => {
-        const builder = new QueryBuilder({
-          quirks,
-          getColumn: (field) => getFieldName({ model, field }),
-        });
-        const text = `SELECT ${quirks.countExpression} AS count FROM ${tableRef(model)}${builder.whereClause(where)}`;
-        const [row] = await run<{ count: number }>({ text, params: builder.values() });
-        return row?.count ?? 0;
-      },
+          findOne: async ({ model, where, select }) => {
+            const getColumn = (field: string) => getFieldName({ model, field });
+            const builder = new QueryBuilder({ quirks, getColumn });
+            const text = `SELECT ${selectColumns({ select, getColumn })} FROM ${tableRef(model)}${builder.whereClause(where)} LIMIT 1`;
+            const [row] = await run<Record<string, unknown>>({ text, params: builder.values() });
+            return (row ?? null) as never;
+          },
 
-      update: async ({ model, where, update }) => {
-        const builder = new QueryBuilder({
-          quirks,
-          getColumn: (field) => getFieldName({ model, field }),
-        });
-        const set = builder.assignments(update as Record<string, unknown>);
-        if (set.length === 0) {
-          return null as never;
-        }
-        const text = `UPDATE ${tableRef(model)} SET ${set.join(', ')}${builder.whereClause(where)} RETURNING *`;
-        const [row] = await run<Record<string, unknown>>({ text, params: builder.values() });
-        return (row ?? null) as never;
-      },
+          findMany: async ({ model, where, limit, sortBy, offset, select }) => {
+            const getColumn = (field: string) => getFieldName({ model, field });
+            const builder = new QueryBuilder({ quirks, getColumn });
+            let text = `SELECT ${selectColumns({ select, getColumn })} FROM ${tableRef(model)}${builder.whereClause(where)}`;
+            if (sortBy) {
+              text += ` ORDER BY ${quoteId(getColumn(sortBy.field))} ${sortBy.direction === 'desc' ? 'DESC' : 'ASC'}`;
+            }
+            if (typeof limit === 'number') {
+              text += ` LIMIT ${builder.placeholder(limit)}`;
+            }
+            if (typeof offset === 'number') {
+              text += ` OFFSET ${builder.placeholder(offset)}`;
+            }
+            return (await run<Record<string, unknown>>({
+              text,
+              params: builder.values(),
+            })) as never;
+          },
 
-      updateMany: async ({ model, where, update }) => {
-        const builder = new QueryBuilder({
-          quirks,
-          getColumn: (field) => getFieldName({ model, field }),
-        });
-        const set = builder.assignments(update);
-        if (set.length === 0) {
-          return 0;
-        }
-        const text = `UPDATE ${tableRef(model)} SET ${set.join(', ')}${builder.whereClause(where)}`;
-        const result = await run<unknown>({ text, params: builder.values() });
-        return result.count;
-      },
+          count: async ({ model, where }) => {
+            const builder = new QueryBuilder({
+              quirks,
+              getColumn: (field) => getFieldName({ model, field }),
+            });
+            const text = `SELECT ${quirks.countExpression} AS count FROM ${tableRef(model)}${builder.whereClause(where)}`;
+            const [row] = await run<{ count: number }>({ text, params: builder.values() });
+            return row?.count ?? 0;
+          },
 
-      delete: async ({ model, where }) => {
-        const builder = new QueryBuilder({
-          quirks,
-          getColumn: (field) => getFieldName({ model, field }),
-        });
-        await run({
-          text: `DELETE FROM ${tableRef(model)}${builder.whereClause(where)}`,
-          params: builder.values(),
-        });
-      },
+          update: async ({ model, where, update }) => {
+            const builder = new QueryBuilder({
+              quirks,
+              getColumn: (field) => getFieldName({ model, field }),
+            });
+            const set = builder.assignments(update as Record<string, unknown>);
+            if (set.length === 0) {
+              return null as never;
+            }
+            const text = `UPDATE ${tableRef(model)} SET ${set.join(', ')}${builder.whereClause(where)} RETURNING *`;
+            const [row] = await run<Record<string, unknown>>({ text, params: builder.values() });
+            return (row ?? null) as never;
+          },
 
-      deleteMany: async ({ model, where }) => {
-        const builder = new QueryBuilder({
-          quirks,
-          getColumn: (field) => getFieldName({ model, field }),
-        });
-        const result = await run<unknown>({
-          text: `DELETE FROM ${tableRef(model)}${builder.whereClause(where)}`,
-          params: builder.values(),
-        });
-        return result.count;
-      },
+          updateMany: async ({ model, where, update }) => {
+            const builder = new QueryBuilder({
+              quirks,
+              getColumn: (field) => getFieldName({ model, field }),
+            });
+            const set = builder.assignments(update);
+            if (set.length === 0) {
+              return 0;
+            }
+            const text = `UPDATE ${tableRef(model)} SET ${set.join(', ')}${builder.whereClause(where)}`;
+            const result = await run<unknown>({ text, params: builder.values() });
+            return result.count;
+          },
 
-      consumeOne: async ({ model, where }) => {
-        const getColumn = (field: string) => getFieldName({ model, field });
-        const builder = new QueryBuilder({ quirks, getColumn });
-        const table = tableRef(model);
-        const idColumn = quoteId(getColumn('id'));
-        const target = oneRowSubquery({
-          table,
-          idColumn,
-          where: builder.whereClause(where),
-        });
-        const [row] = await run<Record<string, unknown>>({
-          text: `DELETE FROM ${table} WHERE ${idColumn} IN (${target}) RETURNING *`,
-          params: builder.values(),
-        });
-        return (row ?? null) as never;
-      },
+          delete: async ({ model, where }) => {
+            const builder = new QueryBuilder({
+              quirks,
+              getColumn: (field) => getFieldName({ model, field }),
+            });
+            await run({
+              text: `DELETE FROM ${tableRef(model)}${builder.whereClause(where)}`,
+              params: builder.values(),
+            });
+          },
 
-      incrementOne: async ({ model, where, increment, set }) => {
-        const getColumn = (field: string) => getFieldName({ model, field });
-        const builder = new QueryBuilder({ quirks, getColumn });
-        const table = tableRef(model);
-        const idColumn = quoteId(getColumn('id'));
-        const absolute = Object.fromEntries(
-          Object.entries(set ?? {}).filter(([column]) => !Object.hasOwn(increment, column)),
-        );
-        const assignments = [...builder.assignments(absolute), ...builder.increments(increment)];
-        const rowGuard = builder.whereClause(where);
-        const target = oneRowSubquery({
-          table,
-          idColumn,
-          where: builder.whereClause(where),
-        });
-        const targetGuard = `${rowGuard}${rowGuard ? ' AND' : ' WHERE'} ${idColumn} IN (${target})`;
-        const [row] = await run<Record<string, unknown>>({
-          text: `UPDATE ${table} SET ${assignments.join(', ')}${targetGuard} RETURNING *`,
-          params: builder.values(),
-        });
-        return (row ?? null) as never;
-      },
+          deleteMany: async ({ model, where }) => {
+            const builder = new QueryBuilder({
+              quirks,
+              getColumn: (field) => getFieldName({ model, field }),
+            });
+            const result = await run<unknown>({
+              text: `DELETE FROM ${tableRef(model)}${builder.whereClause(where)}`,
+              params: builder.values(),
+            });
+            return result.count;
+          },
 
-      // Backs `@better-auth/cli generate`, which has built-in generators only for
-      // Prisma/Drizzle/Kysely and asks every other adapter for its own schema.
-      // `overwrite` is left unset so the CLI asks whether to write the file
-      // instead of claiming it already exists.
-      createSchema: ({ file }) =>
-        Promise.resolve({
-          code: buildSchemaDdl({
-            tables: getSchema(options),
-            pgSchema,
-            tablesPrefix,
-            quirks,
-            idStrategy: options.advanced?.database?.generateId === 'serial' ? 'serial' : 'text',
-            getTable: getModelName,
-            getColumn: getFieldName,
-          }),
-          path: file ?? DEFAULT_SCHEMA_FILE,
+          consumeOne: async ({ model, where }) => {
+            const getColumn = (field: string) => getFieldName({ model, field });
+            const builder = new QueryBuilder({ quirks, getColumn });
+            const table = tableRef(model);
+            const idColumn = quoteId(getColumn('id'));
+            const target = oneRowSubquery({
+              table,
+              idColumn,
+              where: builder.whereClause(where),
+            });
+            const [row] = await run<Record<string, unknown>>({
+              text: `DELETE FROM ${table} WHERE ${idColumn} IN (${target}) RETURNING *`,
+              params: builder.values(),
+            });
+            return (row ?? null) as never;
+          },
+
+          incrementOne: async ({ model, where, increment, set }) => {
+            const getColumn = (field: string) => getFieldName({ model, field });
+            const builder = new QueryBuilder({ quirks, getColumn });
+            const table = tableRef(model);
+            const idColumn = quoteId(getColumn('id'));
+            const absolute = Object.fromEntries(
+              Object.entries(set ?? {}).filter(([column]) => !Object.hasOwn(increment, column)),
+            );
+            const assignments = [
+              ...builder.assignments(absolute),
+              ...builder.increments(increment),
+            ];
+            const rowGuard = builder.whereClause(where);
+            const target = oneRowSubquery({
+              table,
+              idColumn,
+              where: builder.whereClause(where),
+            });
+            const targetGuard = `${rowGuard}${rowGuard ? ' AND' : ' WHERE'} ${idColumn} IN (${target})`;
+            const [row] = await run<Record<string, unknown>>({
+              text: `UPDATE ${table} SET ${assignments.join(', ')}${targetGuard} RETURNING *`,
+              params: builder.values(),
+            });
+            return (row ?? null) as never;
+          },
+
+          // Backs `@better-auth/cli generate`, which has built-in generators only for
+          // Prisma/Drizzle/Kysely and asks every other adapter for its own schema.
+          // `overwrite` is left unset so the CLI asks whether to write the file
+          // instead of claiming it already exists.
+          createSchema: ({ file }) =>
+            Promise.resolve({
+              code: buildSchemaDdl({
+                tables: getSchema(options),
+                pgSchema,
+                tablesPrefix,
+                quirks,
+                idStrategy: options.advanced?.database?.generateId === 'serial' ? 'serial' : 'text',
+                getTable: getModelName,
+                getColumn: getFieldName,
+              }),
+              path: file ?? DEFAULT_SCHEMA_FILE,
+            }),
         }),
-    }),
-  });
+      })(authOptions);
+  }
 
-  return (authOptions) => {
-    options = authOptions;
-    return adapter(authOptions);
-  };
-}
-
-export function bunSqlAdapter(config: BunSqlAdapterConfig): DBAdapterInstance {
-  return createBunSqlAdapter({ config, supportsTransactions: true });
+  return adapterOn({ handle: sql, open: (work) => queued(() => sql.begin(work)) });
 }
