@@ -29,7 +29,14 @@ export function fakeSql({
     return Promise.resolve(result);
   };
   const options = dialect ? { adapter: dialect } : undefined;
-  return { sql: { unsafe, options } as unknown as SQL, calls };
+  // `begin` has to do no more here than hand back a handle that records into
+  // the same call log, which is what makes the emitted SQL comparable.
+  const sql = {
+    unsafe,
+    options,
+    begin: <T>(fn: (scoped: SQL) => Promise<T>) => fn(sql),
+  } as unknown as SQL;
+  return { sql, calls };
 }
 
 export function lastCall(calls: Call[]): Call {

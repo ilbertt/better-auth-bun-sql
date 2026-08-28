@@ -50,6 +50,12 @@ bun run --bun better-auth generate --config src/auth.ts
 
 Run the CLI with `--bun`. Its executable has a Node shebang, so without the flag it won't run on the Bun runtime this package needs.
 
+## Transactions
+
+Nothing to configure: the adapter implements better-auth's `transaction` hook with [`sql.begin`](https://bun.sh/docs/runtime/sql#transactions). A transaction opened inside another runs on the one already open — a nested failure rolls back the whole transaction, not just the nested part.
+
+SQLite gets a single connection where Postgres gets a pool, so on SQLite transactions are queued rather than overlapping, and queries issued outside a transaction while one is open run inside it — they see its uncommitted rows and are rolled back with it.
+
 ## Supported databases
 
 `bun:sql` speaks Postgres, SQLite, and MySQL/MariaDB, but this adapter supports **Postgres and SQLite only**. MySQL/MariaDB lack the `RETURNING` clause the adapter relies on for `create`/`update`, so they are intentionally unsupported (the adapter throws on a MySQL/MariaDB connection). The dialect is detected automatically from the `bun:sql` instance.

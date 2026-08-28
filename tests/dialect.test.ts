@@ -19,6 +19,7 @@ describe('dialect detection from bun:sql instances', () => {
     const quirks = resolveDialect(make());
     expect(quirks.supportsDates).toBe(true);
     expect(quirks.supportsBooleans).toBe(true);
+    expect(quirks.serializeTransactions).toBe(false);
   });
 
   // File-based sqlite URLs open the db on construction, so keep them in the OS
@@ -42,6 +43,7 @@ describe('dialect detection from bun:sql instances', () => {
     const quirks = resolveDialect(sql);
     expect(quirks.supportsDates).toBe(false);
     expect(quirks.supportsBooleans).toBe(false);
+    expect(quirks.serializeTransactions).toBe(true);
     await sql.close();
   });
 

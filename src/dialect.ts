@@ -50,6 +50,13 @@ export interface DialectQuirks {
   countExpression: string;
   /** Case-insensitive comparison: Postgres needs a `::text` cast, SQLite does not. */
   insensitiveColumn: (quotedColumn: string) => string;
+  /**
+   * Whether a transaction has to wait for the one before it to finish.
+   * Postgres takes a connection from the pool per transaction, so they overlap
+   * freely; SQLite runs everything on the one connection, where a second
+   * `BEGIN` fails with "cannot start a transaction within a transaction".
+   */
+  serializeTransactions: boolean;
   ddl: DialectDdl;
 }
 
@@ -60,6 +67,7 @@ const QUIRKS: Record<BunSqlDialect, DialectQuirks> = {
     supportsBooleans: true,
     countExpression: 'count(*)::int',
     insensitiveColumn: (column) => `lower(${column}::text)`,
+    serializeTransactions: false,
     ddl: {
       boolean: 'boolean',
       date: 'timestamptz',
@@ -73,6 +81,7 @@ const QUIRKS: Record<BunSqlDialect, DialectQuirks> = {
     supportsBooleans: false,
     countExpression: 'count(*)',
     insensitiveColumn: (column) => `lower(${column})`,
+    serializeTransactions: true,
     ddl: {
       boolean: 'integer',
       date: 'date',
