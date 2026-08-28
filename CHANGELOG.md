@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-08-28
+
+### 🚀 Features
+
+- Support database transactions (#20)
+
+### 🐛 Bug Fixes
+
+- Avoid ephemeral Postgres ports (#18)
+
 ## [0.3.0] - 2026-08-20
 
 ### 🚀 Features
