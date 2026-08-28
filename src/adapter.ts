@@ -1,4 +1,9 @@
-import { createAdapterFactory, type DBAdapterDebugLogOption } from 'better-auth/adapters';
+import type { BetterAuthOptions } from 'better-auth';
+import {
+  createAdapterFactory,
+  type DBAdapterDebugLogOption,
+  type DBAdapterInstance,
+} from 'better-auth/adapters';
 import { getSchema } from 'better-auth/db';
 import type { SQL } from 'bun';
 import { resolveDialect } from './dialect';
@@ -56,7 +61,13 @@ function oneRowSubquery({
   return `SELECT ${idColumn} FROM ${table}${where} LIMIT 1`;
 }
 
-export function bunSqlAdapter(config: BunSqlAdapterConfig) {
+function createBunSqlAdapter({
+  config,
+  supportsTransactions,
+}: {
+  config: BunSqlAdapterConfig;
+  supportsTransactions: boolean;
+}): DBAdapterInstance {
   const { sql, tablesPrefix, usePlural = false, debugLogs = false } = config;
   const quirks = resolveDialect(sql);
   const pgSchema = quirks.supportsSchemas ? config.pgSchema : undefined;
@@ -71,7 +82,8 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
     return qualified({ pgSchema, table: prefixed({ tablesPrefix, table: model }) });
   }
 
-  return createAdapterFactory({
+  let options: BetterAuthOptions | null = null;
+  const adapter = createAdapterFactory({
     config: {
       adapterId: 'bun-sql',
       adapterName: 'Bun SQL Adapter',
@@ -82,6 +94,17 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
       supportsBooleans: quirks.supportsBooleans,
       usePlural,
       debugLogs,
+      transaction: supportsTransactions
+        ? (callback) =>
+            sql.begin((transactionSql) =>
+              callback(
+                createBunSqlAdapter({
+                  config: { ...config, sql: transactionSql },
+                  supportsTransactions: false,
+                })(options!),
+              ),
+            )
+        : false,
     },
     // `data`/`update` keys arrive already mapped to column names by the factory,
     // but `where`/`select`/`sortBy` carry model field names — so those are mapped
@@ -247,4 +270,13 @@ export function bunSqlAdapter(config: BunSqlAdapterConfig) {
         }),
     }),
   });
+
+  return (authOptions) => {
+    options = authOptions;
+    return adapter(authOptions);
+  };
+}
+
+export function bunSqlAdapter(config: BunSqlAdapterConfig): DBAdapterInstance {
+  return createBunSqlAdapter({ config, supportsTransactions: true });
 }
