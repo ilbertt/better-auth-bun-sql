@@ -34,7 +34,8 @@
     "build": "bun run build.ts",
     "generate:fixtures": "bun run scripts/generate-auth-schema-fixtures.ts",
     "test": "bun --bun vitest run",
-    "check:types": "bun run --bun tsc",
+    "check:typescript-version": "bun run --check scripts/check-typescript-version.ts",
+    "check:types": "bun run check:typescript-version && bun check",
     "check:codestyle": "bun run --bun biome check",
     "check:fixtures": "bun run scripts/check-fixtures.ts",
     "check:all": "bun run --parallel --no-exit-on-error check:types check:codestyle",
@@ -57,7 +58,7 @@
     "git-cliff": "^2.13.1",
     "kysely": "^0.29.5",
     "pg": "^8.23.0",
-    "typescript": "^7.0.2"
+    "typescript": "7.0.2"
   },
   "packageManager": "bun@1.4.3"
 }

@@ -17,7 +17,7 @@
         "git-cliff": "^2.13.1",
         "kysely": "^0.29.5",
         "pg": "^8.23.0",
-        "typescript": "^7.0.2",
+        "typescript": "7.0.2",
       },
       "peerDependencies": {
         "better-auth": ">=1.6.0",

@@ -7,6 +7,12 @@
   ],
   "languages": {
     "JavaScript": {
+      "language_servers": [
+        "typescript-ls",
+        "!vtsls",
+        "!typescript-language-server",
+        "biome"
+      ],
       "formatter": { "language_server": { "name": "biome" } },
       "code_actions_on_format": {
         "source.fixAll.biome": true,
@@ -14,6 +20,12 @@
       }
     },
     "TypeScript": {
+      "language_servers": [
+        "typescript-ls",
+        "!vtsls",
+        "!typescript-language-server",
+        "biome"
+      ],
       "formatter": { "language_server": { "name": "biome" } },
       "code_actions_on_format": {
         "source.fixAll.biome": true,
@@ -21,6 +33,12 @@
       }
     },
     "TSX": {
+      "language_servers": [
+        "typescript-ls",
+        "!vtsls",
+        "!typescript-language-server",
+        "biome"
+      ],
       "formatter": { "language_server": { "name": "biome" } },
       "code_actions_on_format": {
         "source.fixAll.biome": true,
@@ -42,18 +60,13 @@
         "arguments": ["lsp-proxy"]
       }
     },
-    "vtsls": {
+    "typescript-ls": {
       "binary": {
         "path": "./node_modules/.bin/tsc",
         "arguments": ["--lsp", "--stdio"]
-      },
-      "initialization_options": {
-        "vtsls": {
-          "autoUseWorkspaceTsdk": true
-        }
       }
     }
   },
   "prettier": { "allowed": false },
-  "language_servers": ["!eslint", "!prettier", "vtsls"]
+  "language_servers": ["!eslint", "!prettier"]
 }
