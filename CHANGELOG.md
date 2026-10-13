@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.1] - 2026-10-13
+
+### 📦 Build & Dependencies
+
+- Upgrade to bun 1.4.3 (#25)
+- Upgrade to bun 1.4.2 (#22)
+
+### ⚙️ Miscellaneous Tasks
+
+- Use bun check with a pinned TypeScript compiler (#26)
+- Read Bun version from package.json (#24)
+- Remove CLAUDE.md symlink and clarify PR guidance (#23)
+
 ## [0.4.0] - 2026-08-28
 
 ### 🚀 Features
