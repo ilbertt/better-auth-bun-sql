@@ -6,7 +6,7 @@
 
 - **Runtime:** Bun (the adapter relies on `bun:sql` and is Bun-only)
 - **Linter/Formatter:** Biome (auto-formats on save)
-- **Type checks:** `bun check` via `bun check:types`. Keep TypeScript pinned to `bun -p process.versions.typescript` for declaration builds and editor language servers; `check:typescript-version` enforces the match before checks and builds. Editor settings must use the workspace language server.
+- **Type checks:** `bun check` via `bun check:types`. Keep TypeScript pinned to `bun -p process.versions.typescript` for declaration builds and editor language servers; `check:typescript-version` enforces the match before type checks. Editor settings must use the workspace language server.
 - **Tests:** vitest — run with `bun run test` (imports from `vitest`, not `bun:test`). See [Test layout](#test-layout).
 - **Commits:** Conventional Commits (commitlint)
 
