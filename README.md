@@ -10,7 +10,7 @@ bun add @ilbertt/better-auth-bun-sql
 
 > Requires [Bun](https://bun.com) — this adapter relies on the `bun:sql` runtime module and does not work on Node.js.
 >
-> Bun 1.4.3 or later is recommended. Earlier `bun:sql` versions could hand one Postgres query's rows to another when a parameter-less query and a parameterized one shared a connection ([oven-sh/bun#32772](https://github.com/oven-sh/bun/issues/32772)). [Bun 1.4.3](https://bun.com/blog/bun-v1.4.3) also fixes row mix-ups after failed pipelined queries and makes `sql.begin()` reject when Postgres rolls back a transaction after a swallowed query error. The adapter itself runs on 1.3.
+> Bun 1.4.3+ is recommended for its [Postgres query and transaction fixes](https://bun.com/blog/bun-v1.4.3). The adapter supports Bun 1.3+.
 
 ## Usage
 
